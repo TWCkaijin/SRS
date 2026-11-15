@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Cpu, HardDrive, Layers3, MemoryStick, Network, Server } from 'lucide-react';
 import type { Node } from '../types';
 import { Badge, KeyValue, Meter } from '../ui';
@@ -16,6 +16,22 @@ export function NodeCard({ node, detailed = false, emptyLabel = "尚無快照 ·
       in_scope: inventoryGpus.find(item => gpu.uuid && item.uuid ? item.uuid === gpu.uuid : item.index === gpu.index)?.in_scope,
     }))
     : inventoryGpus;
+  const scrollable = gpus.length > 2;
+  const gpuPreview = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const firstTwo = gpuPreview.current;
+    const list = firstTwo?.parentElement;
+    if (!firstTwo || !list) return;
+    const fitPreview = () => {
+      // Use layout pixels so long names, text resizing and zoom can change row height.
+      const height = getComputedStyle(firstTwo).height;
+      if (parseFloat(height) > 0) list.style.maxBlockSize = height;
+    };
+    fitPreview();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(fitPreview) : undefined;
+    observer?.observe(firstTwo);
+    return () => { observer?.disconnect(); list.style.removeProperty('max-block-size'); };
+  }, [scrollable]);
   const gpuRow = (gpu: typeof gpus[number]) => {
       const observed = snapshot?.gpus?.find(item => gpu.uuid && item.uuid ? item.uuid === gpu.uuid : item.index === gpu.index);
       return <div className={`gpu-row ${gpu.in_scope === false ? 'gpu-out-of-scope' : ''}`} key={gpu.uuid || gpu.index}><div className="gpu-chip"><Layers3 size={17} /></div><div className="gpu-description"><strong>{gpu.name.replace(/^NVIDIA\s+/, '')}</strong><span>GPU {gpu.index} · {formatMemory(gpu.memory_mb)}{gpu.in_scope === false ? ' · 不納管' : ''}</span></div><div className="gpu-utilization"><strong>{typeof observed?.utilization_percent === 'number' ? `${observed.utilization_percent}%` : '—'}</strong>{observed && <span>{formatMemory(observed.memory_used_mb)} 已用</span>}</div></div>;
@@ -28,14 +44,14 @@ export function NodeCard({ node, detailed = false, emptyLabel = "尚無快照 ·
     {!header && <footer className="node-footer"><span>{snapshot ? `${snapshot.status === 'monitor_stopped' ? '上次觀測' : snapshot.status === 'error' ? '上次資料' : snapshot.source === 'remote' ? '更新於' : '模擬資料'} ${formatDate(snapshot.collected_at || node.observed_at)}` : emptyLabel}</span></footer>}
     </div>
     <div className="gpu-summary">
-      <div className="gpu-section-heading"><strong>GPU</strong><span>共 {gpus.length} 張{gpus.length > 2 && ' · 可上下捲動'}</span></div>
-      <div className={`gpu-list${gpus.length > 2 ? ' gpu-list-scroll' : ''}`} role="group" aria-label={`${node.display_name || node.alias} 的 GPU 使用狀態`} tabIndex={gpus.length > 2 ? 0 : undefined}>
-        {gpus.length ? gpus.map(gpuRow) : <p className="muted small">{snapshot && !snapshot.gpu_error && snapshot.gpus !== undefined ? '本次觀測未回報 GPU 設備' : '尚無 GPU 設備紀錄'}</p>}
+      <div className="gpu-section-heading"><strong>GPU</strong><span>共 {gpus.length} 張{scrollable && ' · 可上下捲動'}</span></div>
+      <div className={`gpu-list${scrollable ? ' gpu-list-scroll' : ''}`} role="group" aria-label={`${node.display_name || node.alias} 的 GPU 使用狀態`} tabIndex={scrollable ? 0 : undefined}>
+        {scrollable ? <><div className="gpu-preview" ref={gpuPreview}>{gpus.slice(0, 2).map(gpuRow)}</div>{gpus.slice(2).map(gpuRow)}</> : gpus.length ? gpus.map(gpuRow) : <p className="muted small">{snapshot && !snapshot.gpu_error && snapshot.gpus !== undefined ? '本次觀測未回報 GPU 設備' : '尚無 GPU 設備紀錄'}</p>}
       </div>
     </div>
     {actions}
     <div className="machine-detail-area" id={`host-details-${node.id}`} hidden={!expanded}>
-      {expanded && <div className="machine-detail-grid">
+      <div className="machine-detail-grid">
         {hardwareDetails}
         <section className="machine-detail-section">
           <h3><HardDrive size={16} aria-hidden="true" />磁碟</h3>
@@ -56,9 +72,9 @@ export function NodeCard({ node, detailed = false, emptyLabel = "尚無快照 ·
             {!profile.interfaces?.length && <p className="muted small">未回傳網路介面設定</p>}
           </details>}
         </section>
-      </div>}
+      </div>
       {detailed && <dl className="node-details"><KeyValue label="CPU 型號">{node.hardware?.cpu_model || '未記錄'}</KeyValue><KeyValue label="主機名稱">{node.hostname || '未記錄'}</KeyValue><KeyValue label="SSH 身分">{node.ssh_username || '未設定'}</KeyValue><KeyValue label="清單版本">{node.inventory_revision ?? '—'}</KeyValue><KeyValue label="主機金鑰">{node.host_key_sha256 ? <code className="break-all">{node.host_key_sha256}</code> : <span className="text-amber">尚未釘選</span>}</KeyValue></dl>}
-      {expanded && children}
+      {children}
     </div>
     {snapshot?.gpu_error && <p className="monitor-error" role="status">{snapshot.gpu_error}</p>}
   </article>;

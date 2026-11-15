@@ -19,10 +19,17 @@ function mount() {
 afterEach(() => vi.restoreAllMocks());
 describe('explicit real host monitoring', () => {
   it('treats every registered host uniformly and starts/stops with the exact selection; never shows demo readings', async () => {
-    vi.spyOn(api, 'api').mockResolvedValue(empty);
-    const post = vi.spyOn(api, 'post').mockImplementation(async path => path === '/monitor'
-      ? { ...empty, active: true, generation: 'g1', host_ids: ['225', '226', '250'], expires_at: new Date(Date.now() + 45000).toISOString() }
-      : { ...empty, generation: 'g1' });
+    let monitor = empty;
+    vi.spyOn(api, 'api').mockImplementation(async () => monitor);
+    const post = vi.spyOn(api, 'post').mockImplementation(async (path, body) => {
+      if (path === '/monitor') {
+        const selection = body as { host_ids: string[]; interval_seconds: number };
+        monitor = { ...empty, ...selection, active: true, generation: 'g1', expires_at: new Date(Date.now() + 45000).toISOString() };
+      } else if (path === '/monitor/stop') {
+        monitor = { ...empty, generation: 'g1' };
+      }
+      return monitor;
+    });
     mount();
     await waitFor(() => expect(api.api).toHaveBeenCalledWith('/monitor'));
     expect(screen.queryByText('99%')).not.toBeInTheDocument();
@@ -33,7 +40,7 @@ describe('explicit real host monitoring', () => {
     expect(post).toHaveBeenCalledWith('/monitor', { host_ids: ['225', '226', '250'], interval_seconds: 2 });
     expect(screen.getByText('監控中 · 3 台')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox', { name: '監控 AI_Lab_226' }));
-    expect(post).toHaveBeenLastCalledWith('/monitor', { host_ids: ['225', '250'], interval_seconds: 2 });
+    expect(post).toHaveBeenCalledWith('/monitor', { host_ids: ['225', '250'], interval_seconds: 2 });
     await userEvent.click(screen.getByRole('button', { name: '停止監控' }));
     expect(post).toHaveBeenCalledWith('/monitor/stop', { generation: 'g1' });
     expect(screen.queryByRole('button', { name: '停止監控' })).not.toBeInTheDocument();

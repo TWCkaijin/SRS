@@ -22,7 +22,7 @@ export function TrainingSetupPage() {
  useEffect(()=>{if(!busy)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[busy]);
  async function preview(){setBusy('正在檢查所選主機');setError('');setPlan(null);setResults({});setConfirmed(false);try{setPlan(await post<Plan>('/training/preview',{host_ids:selected,master_addr:master,master_port:port,processes,device,python,interface:iface,install_version:install?version:'',wheel}));}catch(e){setError(errorMessage(e));}finally{setBusy('');}}
  async function apply(){if(!plan)return;setError('');try{for(const row of plan.rows){if(results[row.host_id])continue;setBusy(`正在套用 ${name(row.host_id)}${install?'，套件安裝可能需要數分鐘':''}`);const result=await post<Result>('/training/apply',{token:plan.token,host_id:row.host_id});setResults(prev=>({...prev,[row.host_id]:result}));if(result.status!=='success')break;}}catch(e){setError(errorMessage(e));}finally{setBusy('');setConfirmed(false);}}
- return <><PageIntro title="分散式訓練設定" description="選取多台主機，一次建立一致的 PyTorch DDP／torchrun 設定與各節點啟動器。"/>
+ return <><PageIntro title="分散式訓練設定" description="為所選主機建立共用的 PyTorch DDP 設定與個別的 torchrun 啟動器。"/>
  <Notice>設定完成後，在每台節點執行啟動器並指定相同訓練程式。此頁不會啟動訓練、同步資料或變更防火牆；訓練程式需支援 DDP，各節點須能互相連線。</Notice>
  {!can('hosts.terminal')&&<Notice>需要主機終端操作權限才能套用訓練設定。</Notice>}
  <fieldset className="training-form" disabled={!!busy || !can('hosts.terminal')}><legend><Network size={18}/>節點與訓練環境</legend>

@@ -123,7 +123,7 @@ export function NodesPage() {
       const readingFailed = targeted && (result?.status === 'error' || Boolean(result?.error || result?.snapshot?.gpu_error) || stale || (!result && waitingTooLong));
       const readingOK = targeted && result?.status === 'online' && Boolean(result.snapshot) && !readingFailed;
       const tone = readingFailed ? 'error' : readingOK ? 'live' : 'idle';
-      const stateLabel = readingFailed ? '離線' : readingOK ? '已連線' : targeted ? '連線中' : '離線';
+      const stateLabel = readingOK ? '已連線' : targeted && !readingFailed ? 'Pending' : '離線';
       const visible: Node = { ...node, enabled: true,
         display_name: connection?.display_name || node.alias, hostname: connection?.hostname || node.hostname,
         ssh_username: result?.ssh_username || connection?.username || node.ssh_username,
@@ -133,13 +133,24 @@ export function NodesPage() {
       return <section className={`monitor-node host-row state-${tone}`} data-host-id={node.id} data-status={tone} key={node.id}>
         <NodeCard node={visible} showStatus={false} expanded={Boolean(expandedHosts[node.id])}
           header={<>
-<label className="monitor-node-choice"><input type="checkbox" aria-label={`監控 ${node.alias}`} checked={selected.includes(node.id)} disabled={connection?.enabled === false || busy || !can('monitor.manage')} onChange={() => toggle(node.id)} /><div className="host-identity"><h2>{connection?.display_name || node.alias}</h2><span>{connection?.hostname || node.hostname}{connection?.port && connection.port !== 22 ? `:${connection.port}` : ''}</span></div><div className="host-observation">{targeted
-            ? <PingSparkline key={`${node.id}:${monitor.generation}`} ping={result?.ping} clock={clock} />
-            : visible.snapshot
-              ? <time dateTime={visible.snapshot.collected_at}>上次觀測 {formatDate(visible.snapshot.collected_at)}</time>
-              : <span>尚無實際觀測</span>}</div><Badge status={readingFailed ? 'error' : readingOK ? 'online' : 'unknown'} label={stateLabel} /></label>
-        {targeted && result?.error && <p className="host-read-error" role="status">{result.error}<small>嘗試時間 {formatDate(result.checked_at)}</small></p>}
-        {targeted && !result && <p className="monitor-footnote" role="status">等待第一筆真實觀測…</p>}
+            <div className="monitor-node-choice">
+              <input type="checkbox" id={`monitor-select-${node.id}`} aria-label={`監控 ${node.alias}`} checked={selected.includes(node.id)}
+                disabled={connection?.enabled === false || busy || !can('monitor.manage')} onChange={() => toggle(node.id)} />
+              <div className="host-identity">
+                <h2><label htmlFor={`monitor-select-${node.id}`}>{connection?.display_name || node.alias}</label></h2>
+                <span>{connection?.hostname || node.hostname}{connection?.port && connection.port !== 22 ? `:${connection.port}` : ''}</span>
+              </div>
+              <div className="host-observation">
+                {targeted ? result?.ping
+                  ? <PingSparkline key={`${node.id}:${monitor.generation}`} ping={result.ping} clock={clock} />
+                  : <span>Ping —</span>
+                  : visible.snapshot
+                    ? <time dateTime={visible.snapshot.collected_at}>上次觀測 {formatDate(visible.snapshot.collected_at)}</time>
+                    : <span>尚無實際觀測</span>}
+              </div>
+              <span className="host-connection-state" role="status" lang={stateLabel === 'Pending' ? 'en' : undefined}><Badge status={readingFailed ? 'error' : readingOK ? 'online' : 'unknown'} label={stateLabel} /></span>
+            </div>
+            {targeted && result?.error && <p className="host-read-error" role="status">{result.error}<small>嘗試時間 {formatDate(result.checked_at)}</small></p>}
           </>}
           actions={<div className="host-settings-action" role="group" aria-label={`操作 ${connection?.display_name || node.alias}`}><Button variant="ghost" className="host-expand" aria-expanded={Boolean(expandedHosts[node.id])} aria-controls={`host-details-${node.id}`} onClick={() => setExpandedHosts(previous => ({ ...previous, [node.id]: !previous[node.id] }))}>{expandedHosts[node.id] ? '收合資料' : '展開資料'} <span aria-hidden="true">{expandedHosts[node.id] ? '⌃' : '⌄'}</span></Button>{can('hosts.terminal') && <Button variant="ghost" onClick={() => setTerminal(node)} disabled={!connection?.host_key_sha256 || !connection.enabled} title={!connection?.host_key_sha256 ? '請先設定 SSH 並確認主機指紋' : '開啟網頁終端'}><TerminalSquare size={14} />終端</Button>}{can('hosts.manage') && <Button variant="ghost" onClick={() => setEditing(node)}><Settings2 size={14} />設定</Button>}{can('hosts.manage') && <Button variant="ghost" className="text-red" aria-label={`刪除主機：${connection?.display_name || node.alias}`} busy={deleting === node.id} disabled={Boolean(deleting)} onClick={() => void removeHost(node)}><Trash2 size={14} />刪除</Button>}</div>}
           hardwareDetails={<section className="machine-detail-section machine-hardware">

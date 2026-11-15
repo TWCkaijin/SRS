@@ -68,7 +68,16 @@ export function HostProfile({ host, showError = true, defaultOpen = false }: { h
     <details className="profile-disclosure" open={defaultOpen}><summary><HardDrive size={15} />硬體資訊 <span>{profile ? formatDate(host.profile_updated_at) : '尚未建立'}</span><span className="disclosure-chevron" aria-hidden="true">⌄</span></summary>
       {!showError && host.error && <p className="muted small">上次讀取：{host.error}</p>}
       {profile ? <>
-        <dl className="profile-facts"><KeyValue label="首次建立">{formatDate(host.first_seen_at)}</KeyValue><KeyValue label="主機名稱">{profile.hostname}</KeyValue><KeyValue label="系統">{profile.os}</KeyValue><KeyValue label="核心 / 架構">{profile.kernel} / {profile.architecture}</KeyValue><KeyValue label="SSH 帳號">{host.username}</KeyValue><KeyValue label="SSH 指紋">{host.host_key_sha256 || '尚未確認'}</KeyValue><KeyValue label="CPU">{profile.cpu_model}</KeyValue><KeyValue label="核心 / 執行緒">{profile.physical_cores || '—'} / {profile.logical_cpus}</KeyValue><KeyValue label="實體記憶體">{formatMemory(profile.memory_total_mb)}</KeyValue><KeyValue label="顯示卡">{profile.gpu_error ? '無法取得 GPU 清單' : `${profile.gpus.length} 張`}</KeyValue></dl>
+        <dl className="profile-facts"><KeyValue label="主機名稱">{profile.hostname}</KeyValue><KeyValue label="系統">{profile.os}</KeyValue><KeyValue label="核心 / 架構">{profile.kernel} / {profile.architecture}</KeyValue><KeyValue label="CPU">{profile.cpu_model}</KeyValue><KeyValue label="核心 / 執行緒">{profile.physical_cores || '—'} / {profile.logical_cpus}</KeyValue><KeyValue label="實體記憶體">{formatMemory(profile.memory_total_mb)}</KeyValue></dl>
+        {profile.gpu_error && <p className="muted small">盤點時無法取得 GPU 清單。</p>}
+        <details className="device-inventory">
+          <summary>SSH 身分與指紋</summary>
+          <dl className="profile-facts">
+            <KeyValue label="SSH 帳號">{host.username}</KeyValue>
+            <KeyValue label="SSH 指紋">{host.host_key_sha256 || '尚未確認'}</KeyValue>
+            <KeyValue label="首次盤點">{formatDate(host.first_seen_at)}</KeyValue>
+          </dl>
+        </details>
       </> : <p className="muted small">成功登入後會自動建立，後續不必重新輸入硬體規格。</p>}
       {can('hosts.manage') && <Button busy={busy} disabled={['queued', 'connecting'].includes(host.status)} onClick={() => void action('profile')}><RefreshCw size={14} />{profile ? '重新盤點硬體' : '連線並讀取硬體'}</Button>}
     </details>

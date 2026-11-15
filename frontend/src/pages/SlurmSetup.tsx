@@ -51,8 +51,8 @@ export function SlurmSetupPage(){
   await post('/slurm/apply',{token:plan.token,content_hash:plan.content_hash,sudo_passwords:passwords});
   if(mounted.current)setStatus({status:'running',results:{},verification:null});
  }catch(e){setError(errorMessage(e));}finally{setPasswords({});setConfirmed(false);setBusy('');}}
- return <><PageIntro title="Slurm 叢集設定" description="一次選取多台主機，建立由 Slurm 統一排程的研究運算叢集。" action={<Button disabled={!!busy||running} onClick={()=>navigate('/torchrun')}>進階：PyTorch 環境<ArrowRight size={15}/></Button>}/>
- <Notice>新叢集流程支援 Ubuntu 24.04。選擇一台控制節點，其餘節點由 Slurm 分配 CPU、RAM 與你勾選的 GPU；控制節點也可執行工作。</Notice>
+ return <><PageIntro title="Slurm 叢集設定" description="為一台或多台主機配置 Slurm 排程與運算資源。" action={<Button disabled={!!busy||running} onClick={()=>navigate('/torchrun')}>PyTorch 環境<ArrowRight size={15}/></Button>}/>
+ <Notice>適用於 Ubuntu 24.04。控制節點負責排程，也可執行工作。</Notice>
  <fieldset className="training-form" disabled={!!busy||running||!can('hosts.terminal')}><legend><Network size={18}/>1. 選擇主機與控制節點<FieldHelp label="主機選取">勾選這次要安裝與設定新 Slurm 叢集的主機，未勾選的主機不會納入。要做跨主機訓練，需至少兩台；單台也可使用 Slurm 排隊與分配 GPU。</FieldHelp></legend>
  <div className="training-hosts">{hosts.map(host=><label className="import-host checkbox-row" key={host.id}><input type="checkbox" checked={selected.includes(host.id)} disabled={!host.ssh_connection?.host_key_sha256||!!host.ssh_connection?.pending_host_key_sha256} onChange={e=>select(host.id,e.target.checked)}/><span><strong>{name(host.id)}</strong><small>{host.ssh_connection?.hostname}{!host.ssh_connection?.host_key_sha256?' · 先確認 SSH 指紋':''}</small></span></label>)}</div>
  {!hosts.length&&<p>請先在主機監控頁新增 SSH 主機。</p>}

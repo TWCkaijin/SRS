@@ -3,13 +3,25 @@
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import Depends
-from sqlalchemy import delete, select
+from fastapi import Depends, HTTPException
+from sqlalchemy import delete, select, update
 
 from srs.models import AuditEvent, MonitorAlert, MonitorHistory, Node, SessionRecord, iso, now
-from srs.service import row_dict
+from srs.service import audit, row_dict
 
 RETENTION_DAYS = 7
+ALERT_RESOLVE = "monitor.alert.resolve"
+
+
+def alert_views(db, alerts):
+    # The manual resolution audit is written in the same transaction as resolved_at.
+    closed_ids = [alert.id for alert in alerts if alert.resolved_at]
+    actors = {}
+    if closed_ids:
+        actors = dict(db.execute(select(AuditEvent.subject_id, AuditEvent.actor).where(
+            AuditEvent.action == ALERT_RESOLVE, AuditEvent.subject_id.in_(closed_ids),
+        )).all())
+    return [{**row_dict(alert), "resolved_by": actors.get(alert.id)} for alert in alerts]
 
 
 def conditions(result):
@@ -77,8 +89,10 @@ def record_sample(db, host_id, result, observer):
         if rule in current:
             alert.last_seen_at = stamp
         elif observed(rule):
-            alert.resolved_at = stamp
-            changed = True
+            closed = db.execute(update(MonitorAlert).where(
+                MonitorAlert.id == alert.id, MonitorAlert.resolved_at.is_(None),
+            ).values(resolved_at=stamp))
+            changed |= bool(closed.rowcount)
     for rule, message in current.items():
         if rule not in active:
             changed = True
@@ -95,6 +109,20 @@ def record_sample(db, host_id, result, observer):
 
 def register_observability_routes(app, factory, permission, auth):
     read = Depends(permission("read"))
+    manage = Depends(permission("monitor.manage"))
+
+    @app.post("/api/v1/observability/alerts/{alert_id}/resolve")
+    def resolve_alert(alert_id: str, session=manage):
+        with factory.begin() as db:
+            result = db.execute(update(MonitorAlert).where(
+                MonitorAlert.id == alert_id, MonitorAlert.resolved_at.is_(None),
+            ).values(resolved_at=now()))
+            alert = db.get(MonitorAlert, alert_id)
+            if alert is None:
+                raise HTTPException(404, "找不到此筆告警")
+            if result.rowcount:
+                audit(db, session.username, ALERT_RESOLVE, alert.id, {"host_id": alert.host_id, "rule": alert.rule})
+            return alert_views(db, [alert])[0]
 
     @app.get("/api/v1/observability")
     def overview(session=read):
@@ -131,6 +159,7 @@ def register_observability_routes(app, factory, permission, auth):
                                 "session.logout",
                                 "monitor.start",
                                 "monitor.stop",
+                                ALERT_RESOLVE,
                                 "account.plan",
                                 "account.approve",
                                 "account.success",
@@ -144,7 +173,7 @@ def register_observability_routes(app, factory, permission, auth):
             )
             return {
                 "hosts": hosts,
-                "alerts": [row_dict(a) for a in alerts],
+                "alerts": alert_views(db, alerts),
                 "web_sessions": sessions,
                 "events": [row_dict(e) for e in events],
                 "retention_days": RETENTION_DAYS,

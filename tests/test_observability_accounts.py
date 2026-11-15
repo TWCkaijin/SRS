@@ -224,7 +224,7 @@ def test_history_retention_alert_recovery_and_secrets(platform):
     response = client.get("/api/v1/observability")
     assert response.status_code == 200
     result = response.json()
-    assert all(a["resolved_at"] for a in result["alerts"])
+    assert all(a["resolved_at"] and a["resolved_by"] is None for a in result["alerts"])
     assert result["web_sessions"][0]["username"] == "admin"
     assert (
         "token_hash" not in response.text
@@ -235,6 +235,33 @@ def test_history_retention_alert_recovery_and_secrets(platform):
     history = client.get("/api/v1/monitor/history/225?hours=168").json()
     assert history["sample_count"] == 3 and history["items"][0]["observer"] == "admin"
     assert client.get("/api/v1/monitor/history/225?hours=2").status_code == 422
+
+
+def test_manual_alert_resolution_is_durable_and_repeated_anomalies_raise_new_alerts(platform):
+    client, app, _ = platform
+    with app.state.factory.begin() as db:
+        record_sample(db, "225", sample(97), "admin")
+    alert = client.get("/api/v1/observability").json()["alerts"][0]
+    url = f"/api/v1/observability/alerts/{alert['id']}/resolve"
+    assert client.post(url, headers={"X-CSRF-Token": ""}).status_code == 403
+
+    response = client.post(url)
+    assert response.status_code == 200, response.text
+    closed = response.json()
+    assert closed["resolved_at"] and closed["resolved_by"] == "admin"
+    assert closed["last_seen_at"] == alert["last_seen_at"]
+    assert client.post(url).json() == closed
+
+    with app.state.factory.begin() as db:
+        record_sample(db, "225", sample(98), "admin")
+    overview = client.get("/api/v1/observability").json()
+    assert closed in overview["alerts"]
+    pending = [item for item in overview["alerts"] if item["resolved_at"] is None]
+    assert len(pending) == 1 and pending[0]["id"] != alert["id"]
+    assert pending[0]["rule"] == alert["rule"] and pending[0]["resolved_by"] is None
+    events = [event for event in overview["events"] if event["action"] == "monitor.alert.resolve"]
+    assert len(events) == 1 and events[0]["subject_id"] == alert["id"]
+    assert client.post("/api/v1/observability/alerts/missing/resolve").status_code == 404
 
 
 def test_missing_gpu_data_does_not_resolve_vram_alert(platform):

@@ -1,36 +1,52 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useContext, useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, errorMessage, post } from '../api';
 import { ConsoleContext } from '../context';
-import { useContext } from 'react';
 import type { Node } from '../types';
 import { Button, CodeBlock, Field, InlineError, Loading, Notice } from '../ui';
 import { formatDate } from '../utils';
 
 type Account = { username: string; name: string; uid: number; gid: number; home: string; shell: string };
-type Action = 'create' | 'update' | 'delete' | 'lock' | 'unlock';
-type AccountPlan = { id: string; content_hash: string; status: string; expires_at: string; created_at: string; document: { action: Action; username: string; commands: string[][]; change_password: boolean; impact: string; failure_policy: string; runner_script: string; host: { hostname: string; username: string } } };
-const labels: Record<Action, string> = { create: '新增帳號', update: '修改帳號', delete: '刪除帳號（保留家目錄）', lock: '鎖定密碼登入', unlock: '解鎖密碼登入' };
+type Action = 'create' | 'update' | 'delete' | 'lock' | 'unlock' | 'groups' | 'permissions';
+type LinuxGroup = { name: string; gid: number; members: string[]; local: boolean };
+const adminGroups = new Set(['sudo', 'wheel']);
+export type AccountPlan = { host_id: string; id: string; content_hash: string; status: string; expires_at: string; created_at: string; document: { action: Action; username: string; commands: string[][]; change_password: boolean; impact: string; failure_policy: string; runner_script: string; host: { hostname: string; username: string } } };
+const labels: Record<Action, string> = { create: '新增帳號', update: '修改帳號', delete: '刪除帳號（保留家目錄）', lock: '鎖定密碼登入', unlock: '解鎖密碼登入', groups: '附加群組', permissions: '管理員權限' };
 const quote = (s: string) => /^[\w/.-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\\''")}'`;
+
+export function accountCommands(plan: AccountPlan) {
+  const prefix = plan.document.host.username === 'root' ? '' : 'sudo ';
+  return plan.document.commands.map(argv => prefix + argv.map(quote).join(' ')).join('\n');
+}
 
 export function HostAccounts({ node, onBusy }: { node: Node; onBusy: (busy: boolean) => void }) {
   const context = useContext(ConsoleContext);
   const canManage = context?.can('hosts.accounts') ?? false;
   const canApprove = context?.can('plan.approve') ?? false;
   const [items, setItems] = useState<Account[]>([]), [plans, setPlans] = useState<AccountPlan[]>([]);
+  const [groups, setGroups] = useState<LinuxGroup[]>([]);
+  const [localUsers, setLocalUsers] = useState<string[]>([]);
+  const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
   const [editing, setEditing] = useState(false), [action, setAction] = useState<Action>('create');
   const [username, setUsername] = useState(''), [name, setName] = useState(''), [changePassword, setChangePassword] = useState(false);
   const [plan, setPlan] = useState<AccountPlan | null>(null), [confirmation, setConfirmation] = useState(''), [reviewed, setReviewed] = useState(false);
   const [password, setPassword] = useState(''), [sudo, setSudo] = useState('');
   const visibleAccounts = items.filter(account => account.uid >= 1000 && account.uid !== 65534);
+  const account = items.find(item => item.username === username);
+  const changingGroup = action === 'groups' || action === 'permissions';
+  const memberships = groups.filter(group => group.gid !== account?.gid && group.members.includes(username));
+  const groupOptions = groups.filter(group => group.local && group.gid !== 0 && group.gid !== account?.gid
+    && /^[a-z_][a-z0-9_-]{0,31}$/.test(group.name) && adminGroups.has(group.name) === (action === 'permissions'));
+  const selectedGroup = groupOptions.find(group => group.name === groupName);
+  const isMember = selectedGroup?.members.includes(username);
   const alive = useRef(true);
   const reviewRef = useRef<HTMLDivElement>(null);
   useEffect(() => { onBusy(busy); return () => onBusy(false); }, [busy, onBusy]);
   async function reload() {
     setLoading(true); setError('');
     try {
-      const data = await api<{ items: Account[] }>(`/ssh-hosts/${node.id}/accounts`);
-      if (alive.current) setItems(data.items);
+      const data = await api<{ items: Account[]; groups?: LinuxGroup[]; local_users?: string[] }>(`/ssh-hosts/${node.id}/accounts`);
+      if (alive.current) { setItems(data.items); setGroups(data.groups || []); setLocalUsers(data.local_users || []); }
       if (canManage) { const history = await api<{ items: AccountPlan[] }>(`/ssh-hosts/${node.id}/account-plans`); if (alive.current) setPlans(history.items); }
     } catch (e) { if (alive.current) setError(errorMessage(e)); }
     finally { if (alive.current) setLoading(false); }
@@ -38,12 +54,13 @@ export function HostAccounts({ node, onBusy }: { node: Node; onBusy: (busy: bool
   useEffect(() => { alive.current = true; void reload(); return () => { alive.current = false; }; }, [node.id]);
   useEffect(() => { if (plan) { reviewRef.current?.focus({ preventScroll: true }); reviewRef.current?.scrollIntoView?.({ block: 'start' }); } }, [plan]);
   function choose(account: Account | null) {
-    setEditing(true); setAction(account ? 'update' : 'create'); setUsername(account?.username || ''); setName(account?.name || ''); setChangePassword(false); setPlan(null); setPassword(''); setSudo(''); setMessage('');
+    setEditing(true); setAction(account ? 'update' : 'create'); setUsername(account?.username || ''); setName(account?.name || ''); setChangePassword(false); setPlan(null); setPassword(''); setSudo(''); setMessage(''); setGroupName('');
   }
   async function prepare(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try {
-      setPlan(await post<AccountPlan>(`/ssh-hosts/${node.id}/account-plans`, { revision: node.ssh_connection?.revision, action, username, name, change_password: changePassword }));
+      setPlan(await post<AccountPlan>(`/ssh-hosts/${node.id}/account-plans`, { revision: node.ssh_connection?.revision, action, username, name, change_password: changePassword,
+        ...(changingGroup ? { group: groupName, membership: isMember ? 'remove' : 'add' } : {}) }));
       setConfirmation(''); setReviewed(false);
     } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   }
@@ -66,12 +83,29 @@ export function HostAccounts({ node, onBusy }: { node: Node; onBusy: (busy: bool
     })}</tbody></table>{!visibleAccounts.length && <p>沒有符合條件的一般使用者帳號。</p>}</div>}
     {editing && !plan && <form onSubmit={prepare} className="account-editor"><h3>{action === 'create' ? '新增帳號計畫' : `管理 ${username}`}</h3><div className="form-grid">
       <Field label="使用者帳號"><input value={username} onChange={e => setUsername(e.target.value)} disabled={action !== 'create' || busy} required pattern="[a-z_][a-z0-9_-]{0,31}" maxLength={32} /></Field>
-      {action !== 'create' && <Field label="操作"><select value={action} onChange={e => setAction(e.target.value as Action)} disabled={busy}>{(['update', 'lock', 'unlock', 'delete'] as Action[]).map(a => <option key={a} value={a}>{labels[a]}</option>)}</select></Field>}
+      {action !== 'create' && <Field label="操作"><select value={action} onChange={e => { setAction(e.target.value as Action); setGroupName(''); }} disabled={busy}>{(['update', 'lock', 'unlock', 'groups', 'permissions', 'delete'] as Action[]).map(a =>
+        <option key={a} value={a} disabled={(a === 'groups' || a === 'permissions') && !localUsers.includes(username)}>{labels[a]}</option>)}</select></Field>}
       {['create', 'update'].includes(action) && <Field label="顯示名稱"><input value={name} onChange={e => setName(e.target.value)} maxLength={128} disabled={busy} /></Field>}
-    </div>{action === 'update' && <label className="checkbox-row"><input type="checkbox" checked={changePassword} onChange={e => setChangePassword(e.target.checked)} />同時重設密碼（審核時輸入）</label>}
-      <div className="form-actions"><Button onClick={() => setEditing(false)} type="button" disabled={busy}>取消</Button><Button type="submit" variant="primary" busy={busy}>產生操作計畫</Button></div></form>}
+    </div>
+      {account && action !== 'create' && <dl className="account-memberships">
+        <div><dt>主要群組</dt><dd>{groups.find(group => group.gid === account.gid)?.name || account.gid}</dd></div>
+        <div><dt>附加群組</dt><dd>{memberships.filter(group => !adminGroups.has(group.name)).map(group => group.name).join('、') || '無'}</dd></div>
+        <div><dt>管理員群組</dt><dd>{memberships.filter(group => adminGroups.has(group.name)).map(group => group.name).join('、') || '無'}</dd></div>
+      </dl>}
+      {changingGroup && <div className="account-group-editor">
+        {action === 'permissions' && <Notice>這裡管理本機 sudo／wheel 群組成員。實際 sudo 權限由這台主機的 sudoers 決定。</Notice>}
+        {groupOptions.length ? <Field label={action === 'permissions' ? '管理員群組' : '附加群組'}>
+          <select value={groupName} onChange={event => setGroupName(event.target.value)} required disabled={busy}>
+            <option value="">選擇群組</option>
+            {groupOptions.map(group => <option key={group.name} value={group.name}>{group.name}{group.members.includes(username) ? '（已加入）' : ''}</option>)}
+          </select>
+        </Field> : <p className="muted">此主機沒有可選的群組。</p>}
+        {selectedGroup && <p>計畫將{isMember ? '移除' : '加入'} <strong>{groupName}</strong> 成員資格。</p>}
+      </div>}
+      {action === 'update'  && <label className="checkbox-row"><input type="checkbox" checked={changePassword} onChange={e => setChangePassword(e.target.checked)} />同時重設密碼（審核時輸入）</label>}
+      <div className="form-actions"><Button onClick={() => setEditing(false)} type="button" disabled={busy}>取消</Button><Button type="submit" variant="primary" busy={busy} disabled={changingGroup && !selectedGroup}>產生操作計畫</Button></div></form>}
     {plan && <div className="account-review approval-box" ref={reviewRef} tabIndex={-1} role="region" aria-label="帳號操作審核"><h3>審核：{labels[plan.document.action]}</h3><p>{node.alias} · {plan.document.host.hostname} · {plan.document.username}</p><Notice>{plan.document.impact}</Notice><p>{plan.document.failure_policy}</p>
-      <CodeBlock label="將執行的命令" value={plan.document.commands.map(argv => (plan.document.host.username === 'root' ? '' : 'sudo ') + argv.map(quote).join(' ')).join('\n')} />
+      <CodeBlock label="將執行的命令" value={accountCommands(plan)} />
       {plan.document.change_password && <p>chpasswd 透過標準輸入接收新密碼；密碼不列入計畫或日誌。</p>}
       <details><summary>檢視完整執行腳本與前置檢查</summary><CodeBlock value={plan.document.runner_script} /></details>
       <p>有效期限：{formatDate(plan.expires_at)}</p><code className="hash-value">{plan.content_hash}</code>

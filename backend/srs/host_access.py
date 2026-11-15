@@ -16,10 +16,24 @@ from srs.security import check_origin
 from srs.service import audit
 from srs.transport import PinnedSSHClient
 
-LIST_SCRIPT = """import json,pwd,platform
-if platform.system() != 'Linux': raise SystemExit('Linux required')
-print(json.dumps({'items':[{'username':u.pw_name,'name':u.pw_gecos.split(',')[0],'uid':u.pw_uid,'gid':u.pw_gid,'home':u.pw_dir,'shell':u.pw_shell} for u in pwd.getpwall()]}))
+LOCAL_ACCOUNT_HELPERS = """def local_records(path):
+ with open(path, encoding='utf-8', errors='replace') as file:
+  return {row[0]:row for line in file if len(row:=line.rstrip('\\n').split(':'))>=4 and row[2].isdigit()}
 """
+
+LIST_SCRIPT = """import json,pwd,grp,platform
+if platform.system() != 'Linux': raise SystemExit('Linux required')
+""" + LOCAL_ACCOUNT_HELPERS + """local_users=local_records('/etc/passwd')
+local_groups=local_records('/etc/group')
+print(json.dumps({
+ 'items':[{'username':u.pw_name,'name':u.pw_gecos.split(',')[0],'uid':u.pw_uid,'gid':u.pw_gid,'home':u.pw_dir,'shell':u.pw_shell} for u in pwd.getpwall()],
+ 'local_users':list(local_users),
+ 'groups':[{'name':g.gr_name,'gid':g.gr_gid,'members':g.gr_mem,
+            'local':g.gr_name in local_groups and int(local_groups[g.gr_name][2])==g.gr_gid}
+           for g in grp.getgrall()]
+}))
+"""
+
 
 
 class AccountInput(StrictModel):

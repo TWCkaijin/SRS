@@ -17,23 +17,32 @@ remain authoritative. No Apple-native framework is used.
   page exit or lease expiry ends it. There is no unattended monitoring promise.
 - Cached data always has timestamps. Overview labels readings older than 60
   seconds as old records; no inventory GPU count is substituted for live capacity.
-- Each host occupies a full-width horizontal row on desktop: left identity/status
-  with CPU/RAM and a compact timestamp; middle GPU summary; right vertical actions.
-  There is no separate timestamp row or bottom action bar. Narrow screens keep
-  actions at the right of the host summary and give GPUs the full card width. Only the first two
-  GPUs are shown initially, with the remaining count clearly labeled.
-- A per-host expand button reveals remaining GPUs in a separate full-width grid,
-  storage/network, GPU processes and hardware profile below the stable summary. Expanded rows are independent.
-  Successful GPU observations remain authoritative over stale inventory.
-- Login sessions (`who`) appear at the top of Account Management, refreshed every
+- The host summary keeps identity, connection status and CPU/RAM at left,
+  the GPU list in the middle, and host actions at right. The status slot next to
+  identity shows Ping during active observation, the last observation time when
+  stopped, or an empty label before the first reading. Narrow cards move the GPU
+  list below the identity and actions. The header reserves the same slot for
+  connection states; while awaiting the first reading it shows a short
+  Pending status and a Ping placeholder.
+- All GPUs remain available in the collapsed summary. Lists with more than two
+  rows use a compact native vertical scroll region with a count, a visible hint,
+  and keyboard focus. The viewport follows the measured height of the first two
+  GPU rows so a third row does not appear clipped in the resting view. Successful observations take precedence over inventory.
+- Host disclosure uses three sections ordered hardware, storage and network.
+  Columns wrap according to the available card width and stack on a phone.
+  Storage and network lead with observed usage. Lower-priority inventory,
+  SSH identity and GPU process records have their own disclosures.
+- Login sessions (`who`) appear below the searchable host directory in Account Management, refreshed every
   30 seconds from the existing monitor state only. Unmonitored, expired, failed or
   stale readings never appear as current login counts. Counts deduplicate usernames.
   NVIDIA compute processes remain next to host telemetry. Missing, unsupported and empty results have different messages.
 - History retains seven days of approximately 30-second samples, plus alert
   transitions. Charts expose a table and distinct solid/dashed series; missing
   periods are not plotted as continuous observations.
-- Alerts are local read-only records. Missing GPU or storage telemetry does not
-  imply an existing resource alert recovered. No external notifications are sent.
+- Alerts are local records. Operators with monitoring permission can mark an
+  alert as handled from the dashboard or history. The record and actor remain in
+  history, distinct from automatic recovery. Later observations can raise a new
+  alert if the condition persists. Missing telemetry cannot confirm recovery.
 
 ## Account administration
 
@@ -43,6 +52,17 @@ remain authoritative. No Apple-native framework is used.
   for plan precondition and name-conflict checks.
   Website identity/session records remain separate: the existing environment-based
   website administrator authentication model is unchanged.
+- Batch account creation checks all selected, trusted Linux hosts before saving
+  per-host reviewed plans. A shared free UID/GID and a new private group keep
+  the training account consistent for Slurm. A supplied UID/GID supports adding
+  nodes later. Hosts are executed in order with one account password and
+  optional per-host sudo credentials. Results are shown by host; a failure
+  stops undispatched steps and leaves completed changes intact.
+- Single-host accounts show primary, supplementary and administrative groups.
+  Separate reviewed operations change an existing local supplementary group or
+  the host's local sudo/wheel membership. Actual sudo policy remains defined by
+  each host; group updates affect new sessions. The primary group, GID 0, system
+  accounts and the registered SSH account remain protected.
 - Account listing is read-only. New, edit, password reset, password lock/unlock and
   deletion flow through a review panel inside the account modal.
 - Review shows host, target, argv, full runner/preconditions, impact, failure policy,
@@ -57,8 +77,11 @@ remain authoritative. No Apple-native framework is used.
 ## Presentation and accessibility
 
 - Reuse the existing Apple-inspired semantic tokens, theme preference and web
-  controls. Overview uses four summary cards; tables remain horizontally scrollable
-  inside their containers on narrow viewports.
+  controls. Overview places host usage and open alerts side by side where space permits,
+  following four summary metrics. Work records and website activity are available
+  in a secondary disclosure. Tables remain horizontally scrollable
+  inside their containers on narrow viewports. History groups its chart legend
+  and sample count, and operational pages use short titles and focused actions.
 - Dialogs render at the document root to avoid transformed ancestors constraining
   the overlay. Existing focus trap, Escape handling and focus restoration remain.
 - Respect reduced motion, contrast and transparency preferences; keep visible
@@ -95,8 +118,9 @@ commands, screenshots and remaining physical-host validation.
   Samples deduplicate by timestamp, use elapsed-time spacing, and break on failed
   samples or gaps over 30s. Stopping or a new monitoring generation resets it.
   The local vertical scale is exposed in the accessible label and tooltip.
+  The narrowest summary columns show the Ping label without the graph.
 
-- Host header monitoring status uses 離線 for inactive/failed monitoring, 連線中
+- Host header monitoring status uses 離線 for inactive/failed monitoring, Pending
   while awaiting the first response, and 已連線 for successful fresh readings.
 
 - Horizontal host rows use Apple HIG grouping and progressive disclosure adapted
