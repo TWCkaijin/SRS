@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "python": "3.12",
+  "pytorch": "2.14.1",
+  "pytorch_cuda": "12.6",
+  "slurm": "26.05.5",
+  "slurm_rest_api": "v0.0.45",
+  "open_ondemand": "4.2.0",
+  "apptainer": "1.5.5",
+  "mariadb": "11.4.8",
+  "ubuntu": "24.04",
+  "note": "Version selection is not binary provenance. Deployment requires independently verified package/image SHA256 values in the approved plan; unresolved values block deployment.",
+  "sources": {
+    "pytorch": "https://pytorch.org/get-started/previous-versions/",
+    "slurm": "https://www.schedmd.com/download-slurm/",
+    "open_ondemand": "https://osc.github.io/ood-documentation/4.2/",
+    "apptainer": "https://github.com/apptainer/apptainer/releases/tag/v1.5.5",
+    "mariadb": "https://mariadb.com/docs/release-notes/community-server/11.4/11.4.8"
+  }
+}

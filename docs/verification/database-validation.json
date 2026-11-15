@@ -1,0 +1,8 @@
+{
+  "date": "2026-11-07",
+  "sqlite_fresh_upgrade": "0001 -> 0002 head passed",
+  "tables_including_alembic_version": 15,
+  "mariadb": "dialect SQL generated offline only; server transactions and locks not tested",
+  "lima_instances": 0,
+  "docker_daemon": "not running; socket unavailable"
+}

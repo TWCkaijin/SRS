@@ -1,0 +1,29 @@
+Bootstrap: localimage
+From: /srv/srs/staging/python-3.12-rootfs.sif
+
+# Build only after reviewing the base SIF hash, wheel hashes, lockfile and output path.
+# This recipe never installs or changes host NVIDIA drivers.
+%files
+    /srv/srs/staging/wheels-cu126 /opt/wheels
+    /srv/srs/staging/requirements-cu126.lock /opt/requirements.lock
+
+%post
+    set -eu
+    python -m pip install --no-index --find-links=/opt/wheels --require-hashes -r /opt/requirements.lock
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export OMP_NUM_THREADS=1
+
+%test
+    python -c 'import sys, torch; assert sys.version_info[:2] == (3, 12); assert torch.__version__.split("+")[0] == "2.14.1"; assert torch.version.cuda == "12.6"'
+
+%labels
+    SRS.Role research-runtime
+    SRS.PyTorch 2.14.1
+    SRS.CUDA 12.6
+
+%help
+    Offline PyTorch CUDA research runtime. Requires a separately verified local
+    Python 3.12 base image, a complete wheel set, and a pip --require-hashes lock.
+    Research source is provided by the approved immutable Git snapshot at runtime.

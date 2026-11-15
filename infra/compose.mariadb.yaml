@@ -1,0 +1,32 @@
+# Optional local MariaDB integration test service. Nothing invokes compose automatically.
+name: srs-mariadb-test
+services:
+  mariadb:
+    image: ${SRS_MARIADB_IMAGE:?Set mariadb:11.4.8@sha256 with a verified multiarch digest}
+    restart: "no"
+    ports:
+      - "127.0.0.1:13306:3306"
+    environment:
+      MARIADB_DATABASE: srs_test
+      MARIADB_USER: srs_test
+      MARIADB_PASSWORD_FILE: /run/secrets/database_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/root_password
+    secrets:
+      - database_password
+      - root_password
+    volumes:
+      - database:/var/lib/mysql
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 768m
+    cpus: 1.0
+secrets:
+  database_password:
+    file: ${SRS_MARIADB_PASSWORD_FILE:?Set a private local password file path}
+  root_password:
+    file: ${SRS_MARIADB_ROOT_PASSWORD_FILE:?Set a private local root password file path}
+volumes:
+  database:

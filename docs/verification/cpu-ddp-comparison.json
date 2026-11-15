@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "comparison": "single-device vs two-rank fixed-global-batch training",
+  "max_absolute_difference": 3.5762786865234375e-07,
+  "speedup": 0.727623978614822,
+  "note": "This one baseline is correctness evidence; a speedup claim also requires the faster single-GPU baseline and repeated measurements.",
+  "environment": "Darwin arm64, CPU Gloo, two local processes; no Slurm or remote GPU",
+  "date": "2026-11-07"
+}

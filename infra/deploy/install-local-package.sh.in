@@ -1,0 +1,28 @@
+#!/bin/sh
+# Reviewed payload for an already-approved executor step; never SSHs or downloads.
+# The API/worker approval engine is the authorization boundary, not this marker.
+set -eu
+# The executor validates approval and plan hash before dispatch.
+test "$(readlink -f /srv/srs/staging)" = /srv/srs/staging
+PACKAGE='@@PACKAGE_PATH@@'
+EXPECTED_SHA256='@@PACKAGE_SHA256@@'
+case "$PACKAGE" in /srv/srs/staging/*.deb) ;; *) exit 64 ;; esac
+case "$EXPECTED_SHA256" in *[!a-f0-9]*|'') exit 64 ;; esac
+test "${#EXPECTED_SHA256}" -eq 64
+test -f "$PACKAGE"
+test ! -L "$PACKAGE"
+/usr/bin/python3 - "$PACKAGE" <<'SRS_CHECK_PATH'
+import pathlib, stat, sys
+for value in sys.argv[1:]:
+    p = pathlib.Path(value)
+    for candidate in (p, *p.parents):
+        metadata = candidate.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or metadata.st_uid != 0 or metadata.st_mode & 0o022:
+            raise SystemExit("Deployment paths must be root-owned and not group/world writable")
+SRS_CHECK_PATH
+ACTUAL_SHA256="$(sha256sum "$PACKAGE")"
+ACTUAL_SHA256="${ACTUAL_SHA256%% *}"
+test "$ACTUAL_SHA256" = "$EXPECTED_SHA256"
+# Dependencies must already be present or listed as separate, reviewed package steps.
+# dpkg may invoke package maintainer scripts; approval must include that impact.
+exec dpkg --install "$PACKAGE"

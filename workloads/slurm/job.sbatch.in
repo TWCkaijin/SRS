@@ -1,0 +1,10 @@
+#!/bin/bash
+@@SBATCH_DIRECTIVES@@
+set -euo pipefail
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export SLURM_EXPORT_ENV=ALL
+export PYTHONUNBUFFERED=1
+@@RENDEZVOUS@@
+cd @@PROJECT_DIRECTORY@@
+@@SRUN_COMMAND@@

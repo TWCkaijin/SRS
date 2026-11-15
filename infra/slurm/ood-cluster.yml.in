@@ -1,0 +1,13 @@
+v2:
+  metadata:
+    title: SRS pilot research cluster
+  login:
+    host: "@@LOGIN_HOST@@"
+  job:
+    adapter: slurm
+    bin: /opt/slurm/26.05.5/bin
+    conf: /etc/slurm/slurm.conf
+    copy_environment: false
+# OOD jobs need their own reviewed script_wrapper exporting SLURM_EXPORT_ENV=ALL.
+# OOD is optional and cannot bypass the SRS plan-approval contract: do not enable
+# direct submission apps for SRS-managed users until their authorization route is reviewed.

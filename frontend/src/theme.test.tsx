@@ -1,0 +1,23 @@
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, expect, it, vi } from 'vitest';
+import { ThemeControl } from './theme';
+afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
+it('follows system changes, remembers an explicit theme, and restores system behavior',async()=>{
+ const values=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(k:string)=>values.get(k)||null,setItem:(k:string,v:string)=>values.set(k,v)}); const listeners=new Set<()=>void>();
+ const media={matches:true,addEventListener:(_type:string,fn:()=>void)=>listeners.add(fn),removeEventListener:(_type:string,fn:()=>void)=>listeners.delete(fn)};
+ vi.stubGlobal('matchMedia',()=>media);
+ const view=render(<ThemeControl/>);
+ expect(document.documentElement.dataset.theme).toBe('dark');
+ await userEvent.selectOptions(screen.getByLabelText('外觀模式'),'light');
+ expect(localStorage.getItem('srs-theme')).toBe('light');
+ act(()=>{media.matches=true;listeners.forEach(fn=>fn());});
+ expect(document.documentElement.dataset.theme).toBe('light');
+ view.unmount();render(<ThemeControl/>);
+ expect(screen.getByLabelText('外觀模式')).toHaveValue('light');
+ await userEvent.selectOptions(screen.getByLabelText('外觀模式'),'system');
+ expect(document.documentElement.dataset.theme).toBe('dark');
+ act(()=>{media.matches=false;listeners.forEach(fn=>fn());});
+ expect(document.documentElement.dataset.theme).toBe('light');
+ vi.unstubAllGlobals();
+});

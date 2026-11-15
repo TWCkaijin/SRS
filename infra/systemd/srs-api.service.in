@@ -1,0 +1,23 @@
+[Unit]
+Description=Server Remote System approval API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=srs-api
+Group=srs
+WorkingDirectory=/opt/server-remote-system
+EnvironmentFile=/etc/server-remote-system/api.env
+ExecStart=/opt/server-remote-system/.venv/bin/python -m srs.cli api --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/server-remote-system /var/log/server-remote-system
+
+[Install]
+WantedBy=multi-user.target

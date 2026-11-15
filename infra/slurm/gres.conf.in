@@ -1,0 +1,4 @@
+# Render from verified GPU UUID -> PCI bus -> /dev/nvidiaN mapping immediately before approval.
+# The 250 node must enumerate exactly its one allocated GPU, never all GPUs on that host.
+AutoDetect=nvml
+NodeName=@@NODE_NAME@@ Name=gpu Type=@@GPU_TYPE@@ File=@@GPU_DEVICE_FILE@@

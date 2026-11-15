@@ -1,0 +1,118 @@
+#!/bin/sh
+# Fixed reviewed payload; authorization is enforced by the approved-plan executor.
+set -eu
+SOURCE='@@STAGED_FILE@@'
+DESTINATION='@@DESTINATION@@'
+EXPECTED_SHA256='@@FILE_SHA256@@'
+EXPECTED_OLD_SHA256='@@OLD_FILE_SHA256@@'
+BACKUP='@@BACKUP_PATH@@'
+/usr/bin/python3 - "$SOURCE" "$DESTINATION" "$EXPECTED_SHA256" "$EXPECTED_OLD_SHA256" "$BACKUP" <<'SRS_INSTALL_FILE'
+import hashlib
+import json
+import os
+import pathlib
+import re
+import stat
+import sys
+import tempfile
+
+DESTINATIONS = {
+    "/etc/systemd/system/srs-api.service", "/etc/systemd/system/srs-worker.service",
+    "/etc/systemd/system/srs-scheduler.service", "/etc/slurm/slurm.conf",
+    "/etc/slurm/cgroup.conf", "/etc/slurm/gres.conf",
+}
+STAGING = pathlib.Path("/srv/srs/staging")
+
+def secure_path(path):
+    for candidate in (path, *path.parents):
+        info = candidate.lstat()
+        if stat.S_ISLNK(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError("Deployment paths must be root-owned and not group/world writable")
+
+def read_regular(path):
+    secure_path(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 65536:
+            raise ValueError("Expected a bounded regular configuration file")
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            data = stream.read(65537)
+        if len(data) > 65536:
+            raise ValueError("Configuration file changed size")
+        return data
+    finally:
+        os.close(fd)
+
+def matches_destination(destination, expected):
+    if expected == "absent":
+        if os.path.lexists(destination):
+            raise ValueError("Destination appeared after approval")
+        return None
+    data = read_regular(destination)
+    if hashlib.sha256(data).hexdigest() != expected:
+        raise ValueError("Destination bytes changed after approval")
+    return data
+
+def sync_directory(directory):
+    directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+def install_file(source, destination, expected, expected_old, backup):
+    source, destination = pathlib.Path(source), pathlib.Path(destination)
+    if str(destination) not in DESTINATIONS:
+        raise ValueError("Destination is outside the fixed allowlist")
+    if source.parent != STAGING:
+        raise ValueError("Source is outside the fixed staging directory")
+    if not re.fullmatch(r"[a-f0-9]{64}", expected):
+        raise ValueError("Invalid after SHA256")
+    if expected_old != "absent" and not re.fullmatch(r"[a-f0-9]{64}", expected_old):
+        raise ValueError("Invalid before SHA256")
+    expected_backup = "" if expected_old == "absent" else str(destination) + ".srs-backup-" + expected_old[:16]
+    if backup != expected_backup:
+        raise ValueError("Backup path differs from the exact approved path")
+    secure_path(destination.parent)
+    data = read_regular(source)
+    if hashlib.sha256(data).hexdigest() != expected:
+        raise ValueError("Staged bytes changed after approval")
+    original = matches_destination(destination, expected_old)
+    if original is not None:
+        # O_EXCL rejects any existing backup, including a dangling symlink.
+        backup_fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(backup_fd, "wb", closefd=False) as stream:
+                stream.write(original)
+                stream.flush()
+                os.fsync(stream.fileno())
+        finally:
+            os.close(backup_fd)
+        sync_directory(destination.parent)
+    temporary = None
+    try:
+        fd, temporary = tempfile.mkstemp(prefix=".srs-stage-", dir=destination.parent)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fchmod(stream.fileno(), 0o644)
+            os.fsync(stream.fileno())
+        # A fresh check prevents clobbering a change observed during staging.
+        matches_destination(destination, expected_old)
+        if original is None:
+            # Atomic create-if-absent: another destination cannot be overwritten.
+            os.link(temporary, destination, follow_symlinks=False)
+            os.unlink(temporary)
+        else:
+            os.replace(temporary, destination)
+        temporary = None
+        sync_directory(destination.parent)
+    finally:
+        if temporary is not None:
+            os.unlink(temporary)
+    return {"destination": str(destination), "after_sha256": expected, "backup_path": backup or None}
+
+if __name__ == "__main__":
+    print(json.dumps(install_file(*sys.argv[1:]), sort_keys=True))
+SRS_INSTALL_FILE

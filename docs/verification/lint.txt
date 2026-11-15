@@ -1,0 +1,2 @@
+Command: .venv/bin/ruff check backend workloads infra tests scripts migrations
+Result: All checks passed.

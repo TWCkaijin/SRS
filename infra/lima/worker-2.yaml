@@ -1,0 +1,12 @@
+vmType: vz
+arch: aarch64
+cpus: 1
+memory: 2GiB
+disk: 15GiB
+images:
+  - location: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-arm64.img
+mounts: []
+containerd:
+  system: false
+  user: false
+# CPU-only test node; no NVIDIA or x86_64 claims can be derived from this VM.

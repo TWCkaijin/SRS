@@ -1,0 +1,22 @@
+# Unresolved tokens must be replaced from approved inventory before installation.
+ClusterName=srs-pilot
+SlurmctldHost=@@HEAD_NODE@@
+SlurmUser=slurm
+AuthType=auth/munge
+StateSaveLocation=/var/spool/slurmctld
+SlurmdSpoolDir=/var/spool/slurmd
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd.log
+ProctrackType=proctrack/cgroup
+TaskPlugin=task/cgroup,task/affinity
+JobAcctGatherType=jobacct_gather/cgroup
+PrologFlags=Contain
+SelectType=select/cons_tres
+SelectTypeParameters=CR_Core_Memory
+SchedulerType=sched/backfill
+SlurmctldTimeout=120
+SlurmdTimeout=120
+KillWait=30
+ReturnToService=0
+# Add the separately reviewed slurmdbd/accounting configuration before quotas/fair-share claims.
+@@NODE_AND_PARTITION_LINES@@

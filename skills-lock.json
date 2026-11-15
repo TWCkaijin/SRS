@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "apple-hig": {
+      "source": "daft2/apple-hig-skill",
+      "sourceType": "github",
+      "skillPath": "skills/apple-hig/SKILL.md",
+      "computedHash": "5d8210288748824f1ad75d230a942e58067fbcc74edaba18d49b27fc65b248f6",
+      "installMode": "copy"
+    }
+  }
+}

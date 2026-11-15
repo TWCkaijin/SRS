@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "profile": "ddp",
+  "phase": "train",
+  "spec": {
+    "profile": "ddp",
+    "device": "cpu",
+    "steps": 3,
+    "warmup": 0,
+    "global_batch": 4,
+    "sequence_length": 8,
+    "width": 32,
+    "layers": 1,
+    "heads": 4,
+    "vocabulary": 32,
+    "seed": 20261107,
+    "phase": "train"
+  },
+  "rank": 0,
+  "world_size": 2,
+  "backend": "gloo",
+  "device": "cpu",
+  "host_architecture": "arm64",
+  "torch_version": "2.14.1",
+  "cuda_runtime": null,
+  "slurm_job_id": null,
+  "start_step": 0,
+  "completed_step": 3,
+  "training_losses": [
+    3.73209285736084,
+    3.7070021629333496,
+    3.5420305728912354
+  ],
+  "step_seconds": [
+    0.0020440000807866454,
+    0.0009934169938787818,
+    0.0008112500654533505
+  ],
+  "median_step_seconds": 0.0009934169938787818,
+  "samples_per_second": 4026.5065170488574,
+  "training_peak_memory": null,
+  "global_parameter_count": 14784,
+  "local_parameter_count": 14784,
+  "parameter_shards": [
+    {
+      "name": "module.embedding.weight",
+      "global_numel": 1024,
+      "local_numel": 1024,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.norm1.weight",
+      "global_numel": 32,
+      "local_numel": 32,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.norm1.bias",
+      "global_numel": 32,
+      "local_numel": 32,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.qkv.weight",
+      "global_numel": 3072,
+      "local_numel": 3072,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.qkv.bias",
+      "global_numel": 96,
+      "local_numel": 96,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.projection.weight",
+      "global_numel": 1024,
+      "local_numel": 1024,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.projection.bias",
+      "global_numel": 32,
+      "local_numel": 32,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.norm2.weight",
+      "global_numel": 32,
+      "local_numel": 32,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.norm2.bias",
+      "global_numel": 32,
+      "local_numel": 32,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.feed_forward.0.weight",
+      "global_numel": 4096,
+      "local_numel": 4096,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.feed_forward.0.bias",
+      "global_numel": 128,
+      "local_numel": 128,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.feed_forward.2.weight",
+      "global_numel": 4096,
+      "local_numel": 4096,
+      "placements": []
+    },
+    {
+      "name": "module.blocks.0.feed_forward.2.bias",
+      "global_numel": 32,
+      "local_numel": 32,
+      "placements": []
+    },
+    {
+      "name": "module.output.weight",
+      "global_numel": 1024,
+      "local_numel": 1024,
+      "placements": []
+    },
+    {
+      "name": "module.output.bias",
+      "global_numel": 32,
+      "local_numel": 32,
+      "placements": []
+    }
+  ],
+  "checkpoint_saved": false,
+  "evidence_level": "local-cpu",
+  "limits": [
+    "Synthetic correctness workload, not a large-model capacity claim.",
+    "GPU memory is per device; capacities are not a single pooled allocation.",
+    "Throughput alone does not establish speedup without the matching single-GPU baseline."
+  ]
+}
