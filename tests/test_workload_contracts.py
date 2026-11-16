@@ -30,7 +30,7 @@ def test_rank_context_does_not_invent_a_remote_rendezvous():
     with pytest.raises(ValueError, match="MASTER_ADDR"):
         rank_environment({"SLURM_NTASKS": "2", "SLURM_PROCID": "0"})
     assert rank_environment({"SLURM_NTASKS": "2", "SLURM_PROCID": "1", "SLURM_LOCALID": "0",
-                             "MASTER_ADDR": "pilot225", "MASTER_PORT": "29500"}) == (1, 2, 0)
+                             "MASTER_ADDR": "pilot101", "MASTER_PORT": "29500"}) == (1, 2, 0)
 
 
 @pytest.mark.parametrize("spec,world", [(RunSpec(profile="fsdp2"), 2),
@@ -51,9 +51,9 @@ def test_checkpoint_contract_allows_continuation_but_not_different_model():
 
 
 def job_arguments(tmp_path):
-    return {"node_names": ["pilot225", "pilot250"], "project_dir": "/srv/srs/projects/synthetic",
+    return {"node_names": ["pilot101", "pilot103"], "project_dir": "/srv/srs/projects/synthetic",
             "python_executable": "/srv/srs/venv/bin/python", "output_dir": str(tmp_path / "run"),
-            "interfaces": {"pilot225": "enp6s0", "pilot250": "enp3s0"}}
+            "interfaces": {"pilot101": "enp6s0", "pilot103": "enp3s0"}}
 
 
 def test_two_gpu_job_is_bounded_and_interface_mapping_runs_inside_srun(tmp_path):
@@ -61,7 +61,7 @@ def test_two_gpu_job_is_bounded_and_interface_mapping_runs_inside_srun(tmp_path)
     assert "#SBATCH --time=00:05:00" in script
     assert "#SBATCH --ntasks-per-node=1" in script
     assert "#SBATCH --gpus-per-task=1" in script
-    assert "#SBATCH --nodelist=pilot225,pilot250" in script
+    assert "#SBATCH --nodelist=pilot101,pilot103" in script
     assert "srun --kill-on-bad-exit=1" in script
     assert "${SLURMD_NODENAME:?}" in script
     subprocess.run(["/bin/bash", "-n"], input=script, text=True, check=True)
@@ -69,7 +69,7 @@ def test_two_gpu_job_is_bounded_and_interface_mapping_runs_inside_srun(tmp_path)
 
 def test_unapproved_node_or_shell_injection_cannot_change_sbatch_directives(tmp_path):
     values = job_arguments(tmp_path)
-    values["node_names"] = ["pilot225\n#SBATCH --exclusive", "pilot250"]
+    values["node_names"] = ["pilot101\n#SBATCH --exclusive", "pilot103"]
     with pytest.raises(ValueError):
         render_job(RunSpec(profile="ddp", device="cuda"), **values)
     values = job_arguments(tmp_path)

@@ -26,7 +26,7 @@ async def test_all_fixed_json_probes_mask_nested_escaped_secrets(tmp_path, opera
     step["remote_manifest"] = build_manifest(step, ctx)
     assert step["remote_manifest"]["structured_stdout"] == "probe_json"
     assert kind in step["remote_manifest"]["structured_record_kinds"]
-    secret_file = credentials(tmp_path, "HOST_AI_LAB_225_SSH_PASSWORD='quote\"slash\\\\secret'\n")
+    secret_file = credentials(tmp_path, "HOST_TEST_NODE_101_SSH_PASSWORD='quote\"slash\\\\secret'\n")
     adapter = SSHAdapter("remote-slurm", secret_file, connector=connector_for(FakeConnection(process), []))
     result, logs = await collected(adapter, step, ctx)
     assert result["exit_code"] == 0

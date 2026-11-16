@@ -6,12 +6,12 @@
 
 ## 本機啟動
 
-需求：Python 3.12、uv、Node.js／npm。以下命令在本目錄執行：
+需求：Python 3.12、uv、Node.js／pnpm。以下命令在本目錄執行：
 
 ```bash
 uv sync --locked
-npm --prefix frontend ci
-npm --prefix frontend run build
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend build
 cp .env.web.example .env.web
 chmod 600 .env.web
 ```
@@ -22,9 +22,9 @@ chmod 600 .env.web
 .venv/bin/python scripts/dev.py
 ```
 
-開啟 <http://127.0.0.1:8000>，帳號 `admin`。這個啟動器啟動 API、demo executor、scheduler 與獨立監控程序，結束時一併停止。工作派送仍為 demo，使用 `var/srs-demo.sqlite3`；新增／更新 SSH 主機會觸發首次硬體盤點；持續使用率監控需在「主機監控」頁按下「開始實際監控」。憑證由網頁管理，既有 `.env.hosts` 僅用於一次性匯入。
+開啟 <http://127.0.0.1:8000>，帳號 `admin`。這個啟動器先啟動 API，等資料庫建表及初始化完成、健康檢查通過後，才啟動 demo executor、scheduler 與監控程序。結束時一併停止。工作派送仍為 demo，使用 `var/srs-demo.sqlite3`；新增／更新 SSH 主機會觸發首次硬體盤點；持續使用率監控需在「主機監控」頁按下「開始實際監控」。憑證由網頁管理，既有 `.env.hosts` 僅用於一次性匯入。
 
-前端開發可另用 `npm --prefix frontend run dev`，Vite 將 `/api` 代理至 `127.0.0.1:8000`。
+前端開發可另用 `pnpm --dir frontend dev`，Vite 將 `/api` 代理至 `127.0.0.1:8000`。
 
 ## SSH 主機設定、硬體 profile 與實際監控
 
@@ -67,7 +67,7 @@ Profile 持續保存，顯示首次建檔與最後盤點時間；「重新盤點
 
 - `.env.web`：網頁帳密與公開應用設定；登入密碼與遠端密碼獨立。
 - `.env.hosts`：既有工作 executor 專用（網頁觀測不需新增此檔的設定），檔案必須由 executor 帳號持有且權限 `0600`。逐台設定 `HOST_AI_LAB_225_*`／`HOST_AI_LAB_250_*`；SSH、sudo 密碼不互相後備。
-- `config/inventory.yaml`：公開主機位址、SSH 身分、GPU UUID 與金鑰指紋。修改後重新啟動服務會同步資料庫並增加 inventory revision，使舊計畫失效。
+- `config/inventory.yaml`：選用的本機主機清單，含位址、SSH 使用者及硬體資料，已由 Git 忽略。新安裝可直接從網頁新增主機；要使用設定檔時，可複製 `config/inventory.example.yaml` 後自行設定。從舊版本更新前，先將原清單備份到儲存庫外，更新後再放回原位。修改後重啟 API 或執行 `init-db` 會同步並增加變更主機的 inventory revision，使舊計畫失效。
 - `var/`：本機資料。真實部署使用 MariaDB 及受控的 `SRS_DATA_DIR`；`.env*`、資料庫、日誌、成果與測試暫存均排除版本控制。
 
 計畫保存憑證參照，不保存明文密碼。已知憑證在日誌持久化前遮罩，含跨輸出片段的情況；研究程式自行輸出的未知或刻意轉碼秘密無法保證辨識。
@@ -93,8 +93,8 @@ Profile 持續保存，顯示首次建檔與最後盤點時間；「重新盤點
 ```bash
 .venv/bin/pytest -q
 .venv/bin/ruff check backend workloads infra tests scripts migrations
-npm --prefix frontend run build
-npm --prefix frontend test -- --run
+pnpm --dir frontend build
+pnpm --dir frontend test
 ```
 
 真實模式使用獨立服務，不使用 demo 啟動器。先在各服務設定檔將 `SRS_MODE` 設為 `local-slurm` 或 `remote-slurm`，並設定獨立 MariaDB `SRS_DATABASE_URL`、`SRS_DATA_DIR` 與已核對的 inventory；沿用 quickstart 設定仍會是 demo。
@@ -106,7 +106,7 @@ npm --prefix frontend test -- --run
 .venv/bin/python -m srs.cli scheduler
 ```
 
-這些是分別執行的命令。`init-db` 會遷移指定資料庫、同步公開 inventory 並建立預設專案；inventory 變更會增加版本，使舊計畫失效。資料庫備份／遷移／還原目前須另行人工審核，第一版沒有這些操作的網頁計畫產生器。服務檔、資料庫權限、TLS／反向代理及主機金鑰設定見部署文件。本次沒有部署到遠端主機，也沒有建立 Git commit 或 push。
+這些是分別執行的命令。`init-db` 會初始化資料庫、同步本機 inventory 並建立預設專案。demo SQLite 直接建立或補齊 schema，其餘模式執行 Alembic 遷移。inventory 變更會增加版本，使舊計畫失效。資料庫備份／遷移／還原目前須另行人工審核，第一版沒有這些操作的網頁計畫產生器。服務檔、資料庫權限、TLS／反向代理及主機金鑰設定見部署文件。本次沒有部署到遠端主機，也沒有建立 Git commit 或 push。
 
 ## 網頁終端與 Linux 使用者帳號
 

@@ -24,7 +24,7 @@ describe('reviewed-content approval', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('缺少主機金鑰依據');
   });
   it('shows the full commands, changes and evidence as inert text', () => {
-    render(<PlanDocumentView document={{ steps: [{ id: 's1', host_id: 'n225', title: '受審查的設定變更', kind: 'file', argv: ['python3', 'runner.py', 'argument with spaces'], script: '<script>window.bad = true</script>', file_change: { diff: '-old\n+new' }, reason: '先前盤點提供依據', evidence: { snapshot_id: 'snap-1' }, requires_sudo: true, execution_user: 'srs' }] }} />);
+    render(<PlanDocumentView document={{ steps: [{ id: 's1', host_id: 'n101', title: '受審查的設定變更', kind: 'file', argv: ['python3', 'runner.py', 'argument with spaces'], script: '<script>window.bad = true</script>', file_change: { diff: '-old\n+new' }, reason: '先前盤點提供依據', evidence: { snapshot_id: 'snap-1' }, requires_sudo: true, execution_user: 'srs' }] }} />);
     expect(screen.getByText("python3 runner.py 'argument with spaces'")).toBeInTheDocument();
     expect(screen.getByText('<script>window.bad = true</script>')).toBeInTheDocument();
     expect(document.querySelector('script')).toBeNull();
@@ -35,7 +35,7 @@ describe('reviewed-content approval', () => {
 describe('resource truth and mode', () => {
   it('keeps a clear demo disclosure', () => { render(<ModeBanner mode="demo" />); expect(screen.getByRole('status')).toHaveTextContent('模擬環境'); expect(screen.getByRole('status')).toHaveTextContent('開始實際監控'); });
   it('does not turn a missing snapshot into zero usage', () => {
-    const node: Node = { id: 'n225', alias: 'AI_Lab_225', display_name: '225', hostname: 'lab', ssh_username: 'test', enabled: true, inventory_revision: 1, host_key_sha256: null, observed_at: null, hardware: { logical_cpus: 12, memory_gb: 32, gpus: [{ index: 0, name: 'RTX 3060 Ti', memory_mb: 8192, uuid: 'gpu-1', in_scope: true }] }, snapshot: null };
+    const node: Node = { id: 'n101', alias: 'Test_Node_101', display_name: '101', hostname: 'lab', ssh_username: 'test', enabled: true, inventory_revision: 1, host_key_sha256: null, observed_at: null, hardware: { logical_cpus: 12, memory_gb: 32, gpus: [{ index: 0, name: 'RTX 3060 Ti', memory_mb: 8192, uuid: 'gpu-1', in_scope: true }] }, snapshot: null };
     render(<NodeCard node={node} />);
     expect(screen.getAllByText('未觀測')).toHaveLength(2);
     expect(screen.queryByText('0%')).not.toBeInTheDocument();

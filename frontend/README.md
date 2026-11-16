@@ -5,16 +5,16 @@ React / TypeScript frontend for the approval-first control plane. Every page use
 ## Development
 
 ```sh
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 Vite serves `http://127.0.0.1:5173` and proxies `/api` to `http://127.0.0.1:8000`. Set `SRS_API_TARGET` when the backend runs on a different local port. Routes use URL fragments, so the production static server does not need an SPA fallback.
 
 ```sh
-npm run typecheck
-npm test
-npm run build
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
 The production build is emitted to `dist/` and should share an origin with the API. Session cookies stay HTTP-only; mutation requests carry the CSRF token returned by `/session`.

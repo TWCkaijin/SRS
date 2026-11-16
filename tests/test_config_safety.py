@@ -22,7 +22,7 @@ def config_plan(monkeypatch, tmp_path, *, exists=True, evidence=None):
         evidence = ({"exists": True, "content": original.decode(),
                      "sha256": hashlib.sha256(original).hexdigest()} if exists else {"exists": False})
     node = SimpleNamespace(
-        id="225", alias="AI_Lab_225", hostname="test.invalid", port=22,
+        id="101", alias="Test_Node_101", hostname="test.invalid", port=22,
         ssh_username="admin", enabled=True, inventory_revision=1,
         host_key_sha256="SHA256:" + "A" * 43, hardware={"gpus": []},
         facts={"files": {str(path): evidence}}, observed_at="2026-11-07T00:00:00Z",

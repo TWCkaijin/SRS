@@ -27,8 +27,8 @@ def selected_job(db, draft, settings):
         raise HTTPException(404, "請選擇本帳號已登錄的工作")
     if settings.mode != "demo" and not re.fullmatch(r"[0-9]+", job.slurm_job_id):
         raise HTTPException(422, "需要有效的 Slurm job ID")
-    if draft.host_ids != ["225"]:
-        raise HTTPException(422, "成果收集與清理僅在控制節點 225 的共享成果路徑進行")
+    if draft.host_ids != [settings.slurm_controller_id]:
+        raise HTTPException(422, f"成果收集與清理僅在控制節點 {settings.slurm_controller_id} 的共享成果路徑進行")
     return job
 
 

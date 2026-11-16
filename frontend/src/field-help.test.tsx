@@ -10,7 +10,7 @@ it('opens on hover, allows hovering the content, and dismisses with Escape', asy
  expect(screen.getByLabelText('Partition',{exact:true})).toHaveAccessibleDescription('資源分組，不是硬碟分割區。');
 });
 it('supports keyboard focus and touch-style clicks with outside dismissal',async()=>{
- const user=userEvent.setup();render(<><Field label="叢集名稱" help="例如 research_250"><input/></Field><button>其他位置</button></>);
+ const user=userEvent.setup();render(<><Field label="叢集名稱" help="例如 research_103"><input/></Field><button>其他位置</button></>);
  await user.tab();expect(screen.getByRole('button',{name:'叢集名稱說明'})).toHaveFocus();expect(screen.getByRole('tooltip')).toBeInTheDocument();
  await user.keyboard('{Escape}');expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
  await user.click(screen.getByRole('button',{name:'叢集名稱說明'}));expect(screen.getByRole('tooltip')).toBeInTheDocument();

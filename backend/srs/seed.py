@@ -1,13 +1,20 @@
-"""Initialize public inventory without probing a host or inventing current observations."""
+"""Initialize local inventory without probing a host or inventing current observations."""
 import yaml
 from sqlalchemy import select
 
-from srs.config import Settings
+from srs.config import LOCAL_INVENTORY, Settings
 from srs.models import Node, Project
 
 
 def seed(session, settings: Settings) -> None:
-    raw = yaml.safe_load(settings.inventory_file.read_text())
+    try:
+        raw = yaml.safe_load(settings.inventory_file.read_text(encoding="utf-8")) or {}
+    except FileNotFoundError:
+        # A clean checkout starts with no hosts. An explicitly configured file
+        # is still required so a deployment cannot silently omit its inventory.
+        if settings.inventory_file != LOCAL_INVENTORY:
+            raise
+        raw = {}
     for item in raw.get("nodes", []):
         item = dict(item)
         item["id"] = str(item["id"])
@@ -22,7 +29,7 @@ def seed(session, settings: Settings) -> None:
                     setattr(existing, key, value)
             existing.inventory_revision += 1
             existing.snapshot, existing.observed_at = None, None
-            existing.facts = {"source": "operator-updated public inventory", "fresh": False}
+            existing.facts = {"source": "operator-updated local inventory", "fresh": False}
     if session.scalar(select(Project.id).limit(1)) is None:
         session.add(Project(
             id="00000000-0000-4000-8000-000000000001",
@@ -34,4 +41,3 @@ def seed(session, settings: Settings) -> None:
             revision="demo-template-v1" if settings.mode == "demo" else "requires-verified-manifest",
             owner=settings.web_admin_username,
         ))
-    session.commit()

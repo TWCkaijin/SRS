@@ -12,7 +12,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 
 from srs.config import ROOT, Settings
-from srs.database import initialize
+from srs.database import prepare_database
 from srs.models import (
     Artifact,
     AuditEvent,
@@ -41,7 +41,6 @@ from srs.planner import (
 )
 from srs.schemas import ApprovalInput, DraftInput, LoginInput, ProjectInput, RejectionInput, ScheduleInput
 from srs.security import COOKIE, Auth, check_origin, digest
-from srs.seed import seed
 from srs.service import audit, create_execution, execution_dict, invalidate_draft_plans, owned, row_dict
 from srs.ssh_hosts import public_host, register_host_routes
 
@@ -51,9 +50,7 @@ def create_app(settings=None, *, initialize_schema=None):
     settings.validate_runtime()
     # Real modes require the explicit Alembic migration command.
     create_schema = settings.mode == "demo" if initialize_schema is None else initialize_schema
-    engine, factory = initialize(settings, create_schema=create_schema)
-    with factory() as db:
-        seed(db, settings)
+    engine, factory = prepare_database(settings, create_schema=create_schema)
     auth = Auth(settings, factory)
     app = FastAPI(title="研究運算操作台", version="0.1.0", docs_url="/api/docs", redoc_url=None)
     app.state.settings, app.state.factory, app.state.engine = settings, factory, engine

@@ -202,17 +202,17 @@ def test_history_retention_alert_recovery_and_secrets(platform):
     with app.state.factory.begin() as db:
         db.add(
             MonitorHistory(
-                host_id="225",
+                host_id="101",
                 collected_at=iso(datetime.now(UTC) - timedelta(days=8)),
                 observer="admin",
                 result=sample(),
             )
         )
-        record_sample(db, "225", sample(97), "admin")
+        record_sample(db, "101", sample(97), "admin")
     with app.state.factory.begin() as db:
         record_sample(
             db,
-            "225",
+            "101",
             {"status": "error", "checked_at": now(), "error": "unreachable", "snapshot": None},
             "admin",
         )
@@ -220,7 +220,7 @@ def test_history_retention_alert_recovery_and_secrets(platform):
         assert len(list(db.scalars(select(MonitorHistory)))) == 2
         assert len(list(db.scalars(select(MonitorAlert).where(MonitorAlert.resolved_at.is_(None))))) == 2
     with app.state.factory.begin() as db:
-        record_sample(db, "225", sample(), "admin")
+        record_sample(db, "101", sample(), "admin")
     response = client.get("/api/v1/observability")
     assert response.status_code == 200
     result = response.json()
@@ -232,15 +232,15 @@ def test_history_retention_alert_recovery_and_secrets(platform):
         and "auth_revision" not in response.text
     )
     assert any(e["action"] == "session.login" for e in result["events"])
-    history = client.get("/api/v1/monitor/history/225?hours=168").json()
+    history = client.get("/api/v1/monitor/history/101?hours=168").json()
     assert history["sample_count"] == 3 and history["items"][0]["observer"] == "admin"
-    assert client.get("/api/v1/monitor/history/225?hours=2").status_code == 422
+    assert client.get("/api/v1/monitor/history/101?hours=2").status_code == 422
 
 
 def test_manual_alert_resolution_is_durable_and_repeated_anomalies_raise_new_alerts(platform):
     client, app, _ = platform
     with app.state.factory.begin() as db:
-        record_sample(db, "225", sample(97), "admin")
+        record_sample(db, "101", sample(97), "admin")
     alert = client.get("/api/v1/observability").json()["alerts"][0]
     url = f"/api/v1/observability/alerts/{alert['id']}/resolve"
     assert client.post(url, headers={"X-CSRF-Token": ""}).status_code == 403
@@ -253,7 +253,7 @@ def test_manual_alert_resolution_is_durable_and_repeated_anomalies_raise_new_ale
     assert client.post(url).json() == closed
 
     with app.state.factory.begin() as db:
-        record_sample(db, "225", sample(98), "admin")
+        record_sample(db, "101", sample(98), "admin")
     overview = client.get("/api/v1/observability").json()
     assert closed in overview["alerts"]
     pending = [item for item in overview["alerts"] if item["resolved_at"] is None]
@@ -268,10 +268,10 @@ def test_missing_gpu_data_does_not_resolve_vram_alert(platform):
     _, app, _ = platform
     with app.state.factory.begin() as db:
         record_sample(
-            db, "225", sample(gpus=[{"index": 0, "memory_total_mb": 100, "memory_used_mb": 98}]), "admin"
+            db, "101", sample(gpus=[{"index": 0, "memory_total_mb": 100, "memory_used_mb": 98}]), "admin"
         )
     with app.state.factory.begin() as db:
-        record_sample(db, "225", sample(gpu_error="unavailable"), "admin")
+        record_sample(db, "101", sample(gpu_error="unavailable"), "admin")
     with app.state.factory() as db:
         assert db.scalar(select(MonitorAlert)).resolved_at is None
 

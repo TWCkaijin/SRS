@@ -337,9 +337,9 @@ def build_job_steps(db, draft: Draft, nodes: list[Node], settings: Settings, pla
             issues.append("兩節點的共享儲存探測證據必須來自同一輪驗證")
         if len(network_proofs) != len(selected_ids) or len(set(network_proofs)) != 1:
             issues.append("兩節點的網路互通證據必須來自同一輪驗證")
-    controller = db.get(Node, "225")
+    controller = db.get(Node, settings.slurm_controller_id)
     if controller is None or not controller.enabled:
-        raise HTTPException(422, "控制節點 225 尚未啟用")
+        raise HTTPException(422, f"控制節點 {settings.slurm_controller_id} 尚未啟用")
     if controller.id not in {n.id for n in nodes}:
         nodes.append(controller)
     compute_nodes = [db.get(Node, n) for n in draft.host_ids]
@@ -556,8 +556,8 @@ def build_plan(db, draft: Draft, settings: Settings) -> Plan:
         job = db.get(Job, draft.parameters.get("job_id", ""))
         if job is None or job.owner != draft.owner:
             raise HTTPException(404, "找不到可取消的工作")
-        if nodes[0].id != "225" or len(nodes) != 1:
-            raise HTTPException(422, "取消請求必須送至控制節點 225")
+        if nodes[0].id != settings.slurm_controller_id or len(nodes) != 1:
+            raise HTTPException(422, f"取消請求必須送至控制節點 {settings.slurm_controller_id}")
         if job.status.upper() in {"COMPLETED", "CANCELLED", "FAILED", "TIMEOUT"}:
             raise HTTPException(409, "工作已結束，不需取消")
         step = base_step(1, nodes[0], "取消此帳號已登錄的 Slurm 工作", "cancel_job")
@@ -648,8 +648,8 @@ def build_schedule_document(db, schedule: Schedule, settings: Settings) -> tuple
             add_manifest(step, node, settings)
             steps.append(step)
     else:
-        if schedule.host_ids != ["225"]:
-            raise HTTPException(422, "工作狀態／日誌同步只允許控制節點 225")
+        if schedule.host_ids != [settings.slurm_controller_id]:
+            raise HTTPException(422, f"工作狀態／日誌同步只允許控制節點 {settings.slurm_controller_id}")
         ids = schedule.scope.get("job_ids", [])
         if not ids:
             issues.append("請明確選擇至少一個已登錄工作；排程不自動擴大至未來工作")

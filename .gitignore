@@ -9,6 +9,7 @@ __pycache__/
 .env
 .env.web
 .env.hosts
+/config/inventory.yaml
 .env.*.local
 var/
 work/

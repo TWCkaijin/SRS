@@ -7,8 +7,7 @@ from alembic import command
 from alembic.config import Config
 
 from srs.config import ROOT, Settings
-from srs.database import initialize
-from srs.seed import seed
+from srs.database import open_ready_database, prepare_database
 
 
 def main():
@@ -24,14 +23,14 @@ def main():
     scheduler.add_argument("--once", action="store_true")
     monitor = sub.add_parser("monitor", help="Real read-only observations for explicit browser leases")
     monitor.add_argument("--credentials-file", type=Path, help="Optional one-time legacy settings import")
-    sub.add_parser("init-db", help="Apply local database migrations and seed public inventory")
+    sub.add_parser("init-db", help="Prepare the database schema and seed local inventory")
     args = parser.parse_args()
     settings = Settings()
     settings.validate_runtime()
     if args.command == "monitor":
         from srs.monitor import MonitorWorker
 
-        _, factory = initialize(settings, create_schema=settings.mode == "demo")
+        _, factory = open_ready_database(settings)
         asyncio.run(MonitorWorker(settings, factory, args.credentials_file).run())
         return
     if args.command == "api":
@@ -41,19 +40,18 @@ def main():
         uvicorn.run(create_app(settings), host=args.host, port=args.port, log_level="info")
         return
     if args.command == "init-db":
-        config = Config(str(ROOT / "alembic.ini"))
-        config.set_main_option("script_location", str(ROOT / "migrations"))
-        config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
-        command.upgrade(config, "head")
-        _, factory = initialize(settings)
-        with factory() as db:
-            seed(db, settings)
-        print("Database migrated and public inventory registered. No remote host was contacted.")
+        local_demo = settings.mode == "demo" and settings.database_url.startswith("sqlite:")
+        if not local_demo:
+            config = Config(str(ROOT / "alembic.ini"))
+            config.set_main_option("script_location", str(ROOT / "migrations"))
+            config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+            command.upgrade(config, "head")
+        engine, _ = prepare_database(settings, create_schema=local_demo)
+        engine.dispose()
+        print("Database schema ready and local inventory initialized. No remote host was contacted.")
         return
     from srs.worker import Worker
-    _, factory = initialize(settings, create_schema=settings.mode == "demo")
-    with factory() as db:
-        seed(db, settings)
+    _, factory = open_ready_database(settings)
     # Scheduler has no host credentials and does not use a transport.
     service = Worker(settings, factory, credentials_file=getattr(args, "credentials_file", None))
     if args.command == "scheduler":

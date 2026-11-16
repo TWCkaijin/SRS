@@ -47,7 +47,7 @@ def ssh_fixture(monkeypatch, inventories):
 
 def test_batch_checks_union_of_uids_and_gids_then_creates_reviewed_passwordless_plans(platform, monkeypatch):
     client, app, first = trusted(platform)
-    second = save(client, node_id="226", hostname="192.0.2.51")
+    second = save(client, node_id="102", hostname="192.0.2.51")
     with app.state.factory.begin() as db:
         db.get(SSHHost, second["node_id"]).host_key_sha256 = "SHA256:" + "B" * 43
     inventories = {

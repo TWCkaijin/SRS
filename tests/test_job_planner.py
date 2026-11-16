@@ -17,11 +17,11 @@ def fixtures():
     project = Project(id="project", name="Synthetic", path="/srv/srs/projects/synthetic",
                       entrypoint="workloads/train.py", container="/srv/srs/images/synthetic.sif",
                       revision="a" * 40, owner="admin", modes=["cpu", "single", "ddp", "fsdp2"])
-    nodes = [Node(id=str(number), alias=f"AI_Lab_{number}", display_name=str(number), hostname=f"192.0.2.{index}",
+    nodes = [Node(id=str(number), alias=f"Test_Node_{number}", display_name=str(number), hostname=f"192.0.2.{index}",
                   port=22, ssh_username="operator", enabled=True, inventory_revision=1,
                   host_key_sha256="SHA256:test", hardware={}, facts={"projects": {project.id: {
                       "container_sha256": "b" * 64, "revision": {"stdout": project.revision}}}})
-             for index, number in enumerate((225, 250), 1)]
+             for index, number in enumerate((101, 103), 1)]
     return project, nodes
 
 
@@ -74,7 +74,7 @@ def test_project_data_cannot_turn_into_executable_shell():
 
 def build(monkeypatch, mode, project, nodes, execution=None):
     monkeypatch.setattr("srs.planner.add_manifest", lambda *args: None)
-    draft = Draft(id="draft", title="Two rank run", operation="submit_job", host_ids=["225", "250"],
+    draft = Draft(id="draft", title="Two rank run", operation="submit_job", host_ids=["101", "103"],
                   parameters={"project_id": project.id, "profile": "ddp", "args": []}, owner="admin")
     settings = Settings(mode=mode)
     return build_job_steps(FakeDatabase(project, nodes, execution), draft, nodes, settings, "plan-test")
@@ -87,9 +87,9 @@ def valid_evidence(project, nodes):
     for index, node in enumerate(nodes):
         node.facts["cluster"] = {"execution_id": execution.id, "validated_at": now(),
                                  "shared_storage": {"verified": True, "root": "/srv/srs",
-                                                    "peer_ids": ["225", "250"], "probe_id": "shared-round"},
+                                                    "peer_ids": ["101", "103"], "probe_id": "shared-round"},
                                  "network": {"verified": True, "address": f"10.88.0.{index + 1}",
-                                             "interface": f"enp{index + 1}s0", "peer_ids": ["225", "250"],
+                                             "interface": f"enp{index + 1}s0", "peer_ids": ["101", "103"],
                                              "probe_id": "network-round"}}
     return execution
 

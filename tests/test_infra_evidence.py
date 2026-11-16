@@ -19,7 +19,7 @@ def digest(value):
 
 
 def deployment_fixture(component="platform"):
-    node = {"id": "225", "inventory_revision": "fixture-r1", "host_key_sha256": "SHA256:fixture",
+    node = {"id": "101", "inventory_revision": "fixture-r1", "host_key_sha256": "SHA256:fixture",
             "ssh_username": "fixture", "hardware": {"gpus": []}}
     evidence = {"schema_version": 1, "component": component, "execution_id": "fixture-execution",
                 "observed_at": datetime.now(UTC).isoformat(),
@@ -90,12 +90,12 @@ def test_wrong_binary_provenance_version_or_scope_blocks_package(changes):
 
 def cluster_fixture():
     probe_id = "a" * 32
-    witness = {"probe_id": probe_id, "peer_ids": ["225", "250"], "source": "10.10.0.1:/srv/srs", "nonce": "b" * 64}
+    witness = {"probe_id": probe_id, "peer_ids": ["101", "103"], "source": "10.10.0.1:/srv/srs", "nonce": "b" * 64}
     spec = {"schema_version": 1, "probe_id": probe_id,
             "storage": {"root": "/srv/srs", "source": witness["source"],
                         "witness_path": f"/srv/srs/.srs-probes/{probe_id}.json", "witness_sha256": digest(json.dumps(witness))},
-            "peers": [{"id": "225", "address": "10.10.0.225", "interface": "enp0s1", "port": 6818},
-                      {"id": "250", "address": "10.10.0.250", "interface": "enp0s2", "port": 6818}]}
+            "peers": [{"id": "101", "address": "10.10.0.101", "interface": "enp0s1", "port": 6818},
+                      {"id": "103", "address": "10.10.0.103", "interface": "enp0s2", "port": 6818}]}
     spec_sha = digest(json.dumps(validate_probe_spec(spec), sort_keys=True, separators=(",", ":")))
     observations = {}
     for mine in spec["peers"]:
@@ -121,7 +121,7 @@ def parse(observations, spec):
 def test_same_approved_probe_has_narrow_honest_evidence_scope():
     spec, observations = cluster_fixture()
     facts = parse(observations, spec)
-    assert set(facts) == {"225", "250"}
+    assert set(facts) == {"101", "103"}
     for node_id, fact in facts.items():
         assert fact["shared_storage"]["verified"] is True
         assert fact["shared_storage"]["write_visibility_tested"] is False
@@ -134,7 +134,7 @@ def test_same_approved_probe_has_narrow_honest_evidence_scope():
 
 def test_same_named_local_directories_do_not_prove_shared_storage():
     spec, observations = cluster_fixture()
-    observation = observations["250"]
+    observation = observations["103"]
     mount = json.loads(observation["mount"]["stdout"])
     mount["filesystems"][0].update(fstype="ext4", source="/dev/sda1")
     observation["mount"]["stdout"] = json.dumps(mount)
@@ -143,12 +143,12 @@ def test_same_named_local_directories_do_not_prove_shared_storage():
 
 
 @pytest.mark.parametrize("mutation", [
-    lambda o: o.pop("250"),
-    lambda o: o["250"].update(probe_id="c" * 32),
-    lambda o: o["250"]["witness"].update(sha256="d" * 64),
-    lambda o: o["250"]["connections"]["225"].update(connected=False),
-    lambda o: o["250"]["connections"]["225"].update(local_address="10.10.0.251"),
-    lambda o: o["250"]["connections"]["225"]["route"].update(stdout='[{"dev":"wrong-interface"}]'),
+    lambda o: o.pop("103"),
+    lambda o: o["103"].update(probe_id="c" * 32),
+    lambda o: o["103"]["witness"].update(sha256="d" * 64),
+    lambda o: o["103"]["connections"]["101"].update(connected=False),
+    lambda o: o["103"]["connections"]["101"].update(local_address="10.10.0.251"),
+    lambda o: o["103"]["connections"]["101"]["route"].update(stdout='[{"dev":"wrong-interface"}]'),
 ])
 def test_cluster_requires_complete_matching_bilateral_observations(mutation):
     spec, observations = cluster_fixture()
@@ -163,10 +163,10 @@ def test_probe_spec_is_not_an_arbitrary_path_port_or_command_channel():
         changed = copy.deepcopy(spec)
         changed["storage"][path] = value
         with pytest.raises(ValueError):
-            cluster_probe_script(changed, "225")
+            cluster_probe_script(changed, "101")
     spec["peers"][0]["port"] = 443
     with pytest.raises(ValueError):
-        cluster_probe_script(spec, "225")
+        cluster_probe_script(spec, "101")
 
 
 def captured_deployment_fixture():

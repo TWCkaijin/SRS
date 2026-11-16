@@ -44,7 +44,7 @@ def platform(tmp_path):
 
 def make_plan(client, operation="preflight", hosts=None, parameters=None):
     response = client.post("/api/v1/drafts", json={"title": "Local integration", "operation": operation,
-        "host_ids": hosts or ["225"], "parameters": parameters or {}})
+        "host_ids": hosts or ["101"], "parameters": parameters or {}})
     assert response.status_code == 201, response.text
     draft = response.json()
     response = client.post(f"/api/v1/drafts/{draft['id']}/plan")
@@ -118,7 +118,7 @@ def test_changed_or_expired_plan_cannot_dispatch(platform, mutation):
             document["steps"][0]["argv"].append("unapproved")
             record.plan_document = document
         elif mutation == "inventory":
-            db.get(Node, "225").ssh_username = "other-admin"
+            db.get(Node, "101").ssh_username = "other-admin"
         elif mutation == "expiry":
             plan_record.approval_expires_at = iso(datetime.now(UTC) - timedelta(seconds=1))
         elif mutation == "plan_document":
@@ -140,7 +140,7 @@ def test_draft_change_revokes_queued_approval(platform):
     draft, plan = make_plan(client)
     run = approve(client, plan)
     response = client.patch(f"/api/v1/drafts/{draft['id']}", json={"title": "new", "operation": "preflight",
-        "host_ids": ["250"], "parameters": {}})
+        "host_ids": ["103"], "parameters": {}})
     assert response.status_code == 200
     assert asyncio.run(worker.run_once()) is None
     assert client.get(f"/api/v1/executions/{run['id']}").json()["status"] == "invalidated"
@@ -150,8 +150,8 @@ def test_origin_csrf_session_and_excluded_node(platform):
     client, _, _ = platform
     assert client.post("/api/v1/drafts", headers={"X-CSRF-Token": "wrong"}, json={}).status_code == 403
     assert client.post("/api/v1/session", headers={"Origin": "https://evil.example"}, json={"username": "admin", "password": PASSWORD}).status_code == 403
-    assert client.post("/api/v1/drafts", json={"title": "x", "operation": "preflight", "host_ids": ["226"]}).status_code == 422
-    assert client.post("/api/v1/drafts", json={"title": "x", "operation": "preflight", "host_ids": ["225"], "parameters": {"password": "x"}}).status_code == 422
+    assert client.post("/api/v1/drafts", json={"title": "x", "operation": "preflight", "host_ids": ["102"]}).status_code == 422
+    assert client.post("/api/v1/drafts", json={"title": "x", "operation": "preflight", "host_ids": ["101"], "parameters": {"password": "x"}}).status_code == 422
     assert client.delete("/api/v1/session").status_code == 200
     assert client.get("/api/v1/nodes").status_code == 401
 
@@ -167,7 +167,7 @@ def test_failure_stops_dependent_steps_and_preserves_streams(platform):
             return {"exit_code": 17, "signal": "SIGTERM", "timed_out": True, "unknown": False, "outputs": {}}
     adapter = Failing()
     worker.adapter = adapter
-    _, plan = make_plan(client, hosts=["225", "250"])
+    _, plan = make_plan(client, hosts=["101", "103"])
     run = approve(client, plan)
     asyncio.run(worker.run_once())
     result = client.get(f"/api/v1/executions/{run['id']}").json()
@@ -202,7 +202,7 @@ def test_stop_queued_does_not_dispatch(platform):
 
 def test_restart_reconciles_running_step_without_replaying_completed(platform):
     client, worker, app = platform
-    _, plan = make_plan(client, hosts=["225", "250"])
+    _, plan = make_plan(client, hosts=["101", "103"])
     run = approve(client, plan)
     with app.state.factory.begin() as db:
         execution = db.get(Execution, run["id"])
@@ -219,12 +219,12 @@ def test_restart_reconciles_running_step_without_replaying_completed(platform):
     adapter = Reconcile()
     worker.adapter = adapter
     asyncio.run(worker.run_once())
-    assert adapter.calls == [("250", True)]
+    assert adapter.calls == [("103", True)]
 
 
 def schedule_plan(client):
     stamp = datetime.now(UTC)
-    values = {"title": "Read only", "operation": "host_snapshot", "host_ids": ["225"], "interval_seconds": 5,
+    values = {"title": "Read only", "operation": "host_snapshot", "host_ids": ["101"], "interval_seconds": 5,
               "starts_at": iso(stamp - timedelta(seconds=1)), "expires_at": iso(stamp + timedelta(hours=1)), "scope": {"job_ids": []}}
     response = client.post("/api/v1/schedules", json=values)
     assert response.status_code == 201, response.text
@@ -341,7 +341,7 @@ def test_job_log_schedule_persists_source_byte_cursor(platform):
     client, worker, app = platform
     job = submit_demo_job(client, worker)
     stamp = datetime.now(UTC)
-    schedule = client.post("/api/v1/schedules", json={"title": "Job logs", "operation": "job_logs", "host_ids": ["225"],
+    schedule = client.post("/api/v1/schedules", json={"title": "Job logs", "operation": "job_logs", "host_ids": ["101"],
         "interval_seconds": 5, "starts_at": iso(stamp-timedelta(seconds=1)), "expires_at": iso(stamp+timedelta(hours=1)),
         "scope": {"job_ids": [job["id"]]}}).json()
     schedule = client.post(f"/api/v1/schedules/{schedule['id']}/plan").json()

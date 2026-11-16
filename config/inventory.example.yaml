@@ -1,0 +1,13 @@
+# Optional: copy to inventory.yaml to seed hosts from local configuration.
+# Hosts can also be added through the web UI. Keep real host details out of Git.
+nodes: []
+# nodes:
+#   - id: example-node
+#     alias: example-node
+#     display_name: Example node
+#     hostname: 192.0.2.10
+#     port: 22
+#     ssh_username: observer
+#     enabled: false
+#     host_key_sha256: null
+#     hardware: {}

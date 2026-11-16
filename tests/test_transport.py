@@ -20,7 +20,7 @@ PIN = "SHA256:" + "A" * 43
 PLAN_HASH = "b" * 64
 
 
-def host(alias="AI_Lab_225"):
+def host(alias="Test_Node_101"):
     return {"id": alias, "alias": alias, "hostname": "test.invalid", "ssh_username": "admin",
             "port": 22, "enabled": True, "host_key_sha256": PIN, "inventory_revision": 1}
 
@@ -42,9 +42,9 @@ def ssh_step(ctx, *, sudo=False, read_only=True):
 def credentials(tmp_path, extra=""):
     path = tmp_path / ".env.hosts"
     path.write_text(
-        "HOST_AI_LAB_225_USERNAME=admin\nHOST_AI_LAB_225_SSH_PASSWORD=ssh-secret-225\n"
-        "HOST_AI_LAB_225_SUDO_PASSWORD=sudo-secret-225\n"
-        "HOST_AI_LAB_250_USERNAME=otheradmin\nHOST_AI_LAB_250_SSH_PASSWORD=ssh-secret-250\n"
+        "HOST_TEST_NODE_101_USERNAME=admin\nHOST_TEST_NODE_101_SSH_PASSWORD=ssh-secret-101\n"
+        "HOST_TEST_NODE_101_SUDO_PASSWORD=sudo-secret-101\n"
+        "HOST_TEST_NODE_103_USERNAME=otheradmin\nHOST_TEST_NODE_103_SSH_PASSWORD=ssh-secret-103\n"
         + extra
     )
     path.chmod(0o600)
@@ -67,7 +67,7 @@ class FakeInput:
 
     def write(self, text):
         self.writes.append(text)
-        if text == "sudo-secret-225\n":
+        if text == "sudo-secret-101\n":
             self.password_sent.set()
 
     async def drain(self):
@@ -99,7 +99,7 @@ class FakeProcess:
         if secret_output:
             items.extend([
                 {"type": "event", "sequence": 1, "stream": "stdout", "text": "ssh-secret-"},
-                {"type": "event", "sequence": 2, "stream": "stdout", "text": "225"},
+                {"type": "event", "sequence": 2, "stream": "stdout", "text": "101"},
             ])
         if not lost:
             items.append({"type": "result", "result": {"exit_code": 0, "signal": None,
@@ -167,17 +167,17 @@ async def test_demo_never_loads_credentials_or_connects(monkeypatch, tmp_path):
 def test_credentials_are_per_host_and_never_fall_back(tmp_path):
     store = CredentialStore(credentials(tmp_path))
     first = store.for_host(host())
-    second_host = host("AI_Lab_250")
+    second_host = host("Test_Node_103")
     second_host["ssh_username"] = "otheradmin"
     second = store.for_host(second_host)
     assert first.password != second.password
     assert first.sudo_password is None
-    assert store.for_host(host(), sudo=True).sudo_password == "sudo-secret-225"
-    assert "ssh-secret-225" not in repr(first)
+    assert store.for_host(host(), sudo=True).sudo_password == "sudo-secret-101"
+    assert "ssh-secret-101" not in repr(first)
     with pytest.raises(TransportError, match="identity"):
-        store.for_host(host("AI_Lab_250"))
+        store.for_host(host("Test_Node_103"))
     with pytest.raises(TransportError):
-        store.for_host(host("AI_Lab_226"))
+        store.for_host(host("Test_Node_102"))
 
 
 def test_credentials_insecure_permissions_and_env_interpolation(tmp_path, monkeypatch):
@@ -232,11 +232,11 @@ async def test_ssh_quoted_transport_and_stream_redaction(tmp_path):
     adapter = SSHAdapter("remote-slurm", credentials(tmp_path), connector=connector_for(connection, calls))
     result, logs = await collected(adapter, ssh_step(ctx), ctx)
     assert result["exit_code"] == 0
-    assert "ssh-secret-225" not in json.dumps(logs)
+    assert "ssh-secret-101" not in json.dumps(logs)
     assert "[REDACTED]" in "".join(text for _, text in logs)
     assert calls[0][1]["client_keys"] == [] and calls[0][1]["agent_path"] is None
     assert calls[0][1]["known_hosts"] == [] and calls[0][1]["config"] == []
-    assert "ssh-secret-225" not in connection.commands[0]
+    assert "ssh-secret-101" not in connection.commands[0]
     payload = json.loads(process.stdin.writes[0])
     assert payload["argv"][-1] == "$(do-not-run); and 'quoted'"
     assert payload["read_only"] is True
@@ -249,9 +249,9 @@ async def test_ssh_sudo_uses_its_own_password_only_after_prompt(tmp_path):
     adapter = SSHAdapter("remote-slurm", credentials(tmp_path), connector=connector_for(FakeConnection(process), []))
     result, logs = await collected(adapter, ssh_step(ctx, sudo=True), ctx)
     assert result["exit_code"] == 0
-    assert process.stdin.writes[0] == "sudo-secret-225\n"
+    assert process.stdin.writes[0] == "sudo-secret-101\n"
     assert len(process.stdin.writes) == 2
-    assert "sudo-secret-225" not in json.dumps(logs)
+    assert "sudo-secret-101" not in json.dumps(logs)
 
 
 @pytest.mark.asyncio

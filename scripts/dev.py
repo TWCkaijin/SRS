@@ -2,14 +2,37 @@
 """Run demo services plus an idle, opt-in real observation worker."""
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.request import ProxyHandler, build_opener
 
 from srs.config import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
+ADDRESS = ("127.0.0.1", 8000)
+BASE_URL = f"http://{ADDRESS[0]}:{ADDRESS[1]}"
+
+
+def wait_for_api(process, *, timeout=90, stopping=lambda: False):
+    """Wait for the API's health route, which only exists after database setup."""
+    opener = build_opener(ProxyHandler({}))
+    deadline = time.monotonic() + timeout
+    while not stopping() and time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise SystemExit("API exited before the database was ready. See the startup error above.")
+        try:
+            with opener.open(f"{BASE_URL}/api/v1/health", timeout=0.5) as response:
+                if response.status == 200 and process.poll() is None:
+                    return
+        except OSError:
+            pass
+        time.sleep(0.15)
+    if not stopping():
+        raise SystemExit("Timed out waiting for the API and database. No background services were started.")
+
 
 
 def main():
@@ -17,7 +40,7 @@ def main():
     if not settings.configured:
         raise SystemExit("Copy .env.web.example to .env.web and set a unique WEB_ADMIN_PASSWORD of at least 12 characters.")
     if not (ROOT / "frontend/dist/index.html").is_file():
-        raise SystemExit("Build the frontend first: npm --prefix frontend ci && npm --prefix frontend run build")
+        raise SystemExit("Build the frontend first: pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend build")
     environment = {**os.environ, "SRS_MODE": "demo"}
     processes = []
     stopping = False
@@ -27,13 +50,23 @@ def main():
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
     try:
-        for command in (["api", "--host", "127.0.0.1", "--port", "8000"], ["worker"], ["scheduler"],
-                        ["monitor", "--credentials-file", str(ROOT / ".env.hosts")]):
+        with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                probe.bind(ADDRESS)
+            except OSError:
+                raise SystemExit(f"{BASE_URL} is unavailable. Stop the existing service before starting SRS.") from None
+        api = subprocess.Popen(
+            [sys.executable, "-m", "srs.cli", "api", "--host", ADDRESS[0], "--port", str(ADDRESS[1])],
+            cwd=ROOT, env=environment,
+        )
+        processes.append(api)
+        wait_for_api(api, stopping=lambda: stopping)
+        if stopping:
+            return
+        for command in (["worker"], ["scheduler"], ["monitor", "--credentials-file", str(ROOT / ".env.hosts")]):
             processes.append(subprocess.Popen([sys.executable, "-m", "srs.cli", *command], cwd=ROOT, env=environment))
-            # Let the API create the demo schema before the other processes open it.
-            if command[0] == "api":
-                time.sleep(1)
-        print("http://127.0.0.1:8000 — jobs: demo; monitoring: real SSH only after Start. Ctrl+C stops all services.", flush=True)
+        print(f"{BASE_URL} — database ready. Jobs: demo; monitoring: real SSH only after Start. Ctrl+C stops all services.", flush=True)
         while not stopping:
             if any(process.poll() is not None for process in processes):
                 raise SystemExit("A demo process stopped; shutting down the remaining services.")

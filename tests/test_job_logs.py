@@ -187,7 +187,7 @@ def test_probe_rejects_fifo_without_blocking(monkeypatch, tmp_path):
 
 def test_secrets_crossing_pages_and_partial_eof_never_escape(monkeypatch, tmp_path):
     root, step, ctx = log_step(monkeypatch, tmp_path, page_bytes=16)
-    secret = "ssh-secret-225"
+    secret = "ssh-secret-101"
     path = root / "123.stdout"
     path.write_text("prefix12345678" + secret + "\nend\n")
     output = []
@@ -208,16 +208,16 @@ def test_secrets_crossing_pages_and_partial_eof_never_escape(monkeypatch, tmp_pa
         assert "ssh" not in safe["text"] and "secret" not in safe["text"]
         ctx["job_log_offsets"][JOB_ID]["stdout"] = records[0]["end"]
     with path.open("a") as target:
-        target.write("225\n")
+        target.write("101\n")
     records, _ = run_probe(step, ctx)
     safe = job_logs.sanitize_record(records[0], step["job_log_scope"], ctx["job_log_offsets"], [secret])
-    assert "225" not in safe["text"] and "[REDACTED]" in safe["text"]
+    assert "101" not in safe["text"] and "[REDACTED]" in safe["text"]
 
 
 @pytest.mark.asyncio
 async def test_ssh_parses_chunked_log_records_before_masking(monkeypatch, tmp_path):
     root, step, ctx = log_step(monkeypatch, tmp_path)
-    (root / "123.stdout").write_text('a "quoted" ssh-secret-225\n')
+    (root / "123.stdout").write_text('a "quoted" ssh-secret-101\n')
     records, result = run_probe(step, ctx)
     process = fake_structured_process(result.stdout)
     adapter = SSHAdapter("remote-slurm", credentials(tmp_path), connector=connector_for(FakeConnection(process), []))
@@ -227,7 +227,7 @@ async def test_ssh_parses_chunked_log_records_before_masking(monkeypatch, tmp_pa
     assert decoded[0]["text"] == 'a "quoted" [REDACTED]\n'
     assert decoded[0]["end"] == records[0]["end"]
     assert "window_start" not in decoded[0]
-    assert b"ssh-secret-225" not in base64.b64decode(decoded[0]["data_b64"])
+    assert b"ssh-secret-101" not in base64.b64decode(decoded[0]["data_b64"])
     payload = json.loads(process.stdin.writes[0])
     assert payload["structured_stdout"] == "job_log"
     assert "${job_log_offset:" not in payload["argv"][-1]
@@ -237,7 +237,7 @@ async def test_ssh_parses_chunked_log_records_before_masking(monkeypatch, tmp_pa
 async def test_long_secret_fails_before_network(monkeypatch, tmp_path):
     _, step, ctx = log_step(monkeypatch, tmp_path)
     calls = []
-    secret_file = credentials(tmp_path, "HOST_AI_LAB_225_SSH_PASSWORD=" + "s" * 4097 + "\n")
+    secret_file = credentials(tmp_path, "HOST_TEST_NODE_101_SSH_PASSWORD=" + "s" * 4097 + "\n")
     adapter = SSHAdapter("remote-slurm", secret_file, connector=connector_for(FakeConnection(), calls))
     result, _ = await collected(adapter, step, ctx)
     assert result["exit_code"] == 65 and not calls
@@ -256,7 +256,7 @@ async def test_artifact_nested_json_is_masked_after_parsing(tmp_path):
             "evidence": [{"job_id": JOB_ID}]}
     step["remote_manifest"] = build_manifest(step, ctx)
     process = fake_structured_process(json.dumps(record) + "\n")
-    secret_file = credentials(tmp_path, "HOST_AI_LAB_225_SSH_PASSWORD='quote\"slash\\\\secret'\n")
+    secret_file = credentials(tmp_path, "HOST_TEST_NODE_101_SSH_PASSWORD='quote\"slash\\\\secret'\n")
     adapter = SSHAdapter("remote-slurm", secret_file, connector=connector_for(FakeConnection(process), []))
     result, logs = await collected(adapter, step, ctx)
     assert result["exit_code"] == 0

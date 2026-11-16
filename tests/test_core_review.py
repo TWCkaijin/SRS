@@ -19,7 +19,7 @@ def test_nodes_endpoint_does_not_expose_other_owners_result_content(platform):
     client, _, app = platform
     marker = "OTHER-OWNER-PRIVATE-ARTIFACT-CONTENT"
     with app.state.factory.begin() as db:
-        node = db.get(Node, "225")
+        node = db.get(Node, "101")
         node.facts = {**node.facts, "results": {"another-owners-job": {"rank-0.json": {"text": marker}}}}
     response = client.get("/api/v1/nodes")
     assert response.status_code == 200
@@ -45,12 +45,12 @@ def test_worker_that_lost_lease_cannot_commit_step_result(platform):
     with app.state.factory() as db:
         step = db.scalar(select(ExecutionStep).where(ExecutionStep.execution_id == execution["id"]))
         assert step.status == "running", "Stale worker overwrote the replacement worker's step state"
-        assert db.get(Node, "225").snapshot is None
+        assert db.get(Node, "101").snapshot is None
 
 
 def test_started_plan_may_finish_approved_steps_after_start_deadline(platform):
     client, worker, app = platform
-    _, plan = make_plan(client, hosts=["225", "250"])
+    _, plan = make_plan(client, hosts=["101", "103"])
     approve(client, plan)
 
     class ExpiresAfterFirst:
@@ -79,7 +79,7 @@ async def test_preflight_nested_json_cannot_persist_escaped_known_secret(tmp_pat
     step = ssh_step(ctx)
     step["operation"] = "preflight"
     step["remote_manifest"] = build_manifest(step, ctx)
-    secret_file = credentials(tmp_path, "HOST_AI_LAB_225_SSH_PASSWORD='quote\"slash\\\\secret'\n")
+    secret_file = credentials(tmp_path, "HOST_TEST_NODE_101_SSH_PASSWORD='quote\"slash\\\\secret'\n")
     adapter = SSHAdapter("remote-slurm", secret_file, connector=connector_for(FakeConnection(process), []))
     result, logs = await collected(adapter, step, ctx)
     assert result["exit_code"] == 0

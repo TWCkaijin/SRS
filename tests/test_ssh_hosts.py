@@ -61,7 +61,7 @@ async def test_new_host_needs_no_env_and_profile_survives_reseed(platform):
     worker.probe = AsyncMock(return_value=result())
     await worker.run_profiles()
     worker.probe.assert_awaited_once()
-    with app.state.factory() as db:
+    with app.state.factory.begin() as db:
         seed(db, app.state.settings)
     response = client.get('/api/v1/nodes')
     node = next(n for n in response.json()['items'] if n['id'] == saved['node_id'])
@@ -73,17 +73,17 @@ async def test_new_host_needs_no_env_and_profile_survives_reseed(platform):
 
 
 @pytest.mark.asyncio
-async def test_226_is_configured_and_observed_like_any_other_host(platform):
+async def test_102_is_configured_and_observed_like_any_other_host(platform):
     client, _, worker = platform
-    saved = save(client, node_id='226')
+    saved = save(client, node_id='102')
     worker.probe = AsyncMock(return_value=result())
     await worker.run_profiles()
-    response = client.post('/api/v1/monitor', json={'host_ids': ['226'], 'interval_seconds': 1})
+    response = client.post('/api/v1/monitor', json={'host_ids': ['102'], 'interval_seconds': 1})
     assert response.status_code == 200 and response.json()['interval_seconds'] == 1
     await worker.run_once()
     state = client.get('/api/v1/monitor').json()
-    assert state['results']['226']['snapshot']['source'] == 'remote'
-    assert saved['node_id'] == '226'
+    assert state['results']['102']['snapshot']['source'] == 'remote'
+    assert saved['node_id'] == '102'
 
 
 @pytest.mark.asyncio
@@ -134,14 +134,14 @@ def test_host_settings_permissions_validation_and_secret_redaction(platform):
 
 def test_legacy_import_never_overwrites_gui_settings(platform, tmp_path):
     client, app, worker = platform
-    save(client, node_id='225', username='gui-user')
+    save(client, node_id='101', username='gui-user')
     path = tmp_path / 'legacy.env'
-    path.write_text('HOST_AI_LAB_225_USERNAME=legacy-user\nHOST_AI_LAB_225_SSH_PASSWORD=legacy-secret\n')
+    path.write_text('HOST_TEST_NODE_101_USERNAME=legacy-user\nHOST_TEST_NODE_101_SSH_PASSWORD=legacy-secret\n')
     path.chmod(0o600)
     worker.credentials.path = path
     worker.import_legacy_settings()
     with app.state.factory() as db:
-        assert db.get(SSHHost, '225').username == 'gui-user'
+        assert db.get(SSHHost, '101').username == 'gui-user'
         assert len(list(db.scalars(select(SSHHost)))) == 1
 
 
@@ -158,31 +158,35 @@ def test_network_rates_require_two_samples_and_reject_counter_resets():
     assert current['snapshot']['network'][0]['rx_bytes_per_second'] is None
 
 @pytest.mark.asyncio
-async def test_slow_host_does_not_delay_other_host_sampling(platform):
+async def test_slow_host_does_not_delay_other_host_sampling(platform, monkeypatch):
     import asyncio
     client, app, worker = platform
-    state = client.post('/api/v1/monitor', json={'host_ids': ['225', '226'], 'interval_seconds': 1}).json()
+    state = client.post('/api/v1/monitor', json={'host_ids': ['101', '102'], 'interval_seconds': 1}).json()
     from srs.models import MonitorSession
     with app.state.factory() as db:
         session_id = db.scalar(select(MonitorSession.id))
     slow_started = asyncio.Event()
     release_slow = asyncio.Event()
     async def probe(host):
-        if host['id'] == '226':
+        if host['id'] == '102':
             slow_started.set()
             await release_slow.wait()
         return result()
+    async def ping(hostname):
+        return {"status": "ok", "ms": 1.0}
+
+    monkeypatch.setattr("srs.ping.ping_host", ping)
     worker.probe = probe
-    tasks = [asyncio.create_task(worker.watch_host(session_id, state['generation'], host)) for host in ['225', '226']]
+    tasks = [asyncio.create_task(worker.watch_host(session_id, state['generation'], host)) for host in ['101', '102']]
     try:
         await asyncio.wait_for(slow_started.wait(), timeout=2)
         await asyncio.sleep(.05)
         observed = client.get('/api/v1/monitor').json()['results']
-        assert '225' in observed and '226' not in observed
+        assert '101' in observed and '102' not in observed
         client.post('/api/v1/monitor/stop', json={'generation': state['generation']})
         release_slow.set()
         await asyncio.wait_for(asyncio.gather(*tasks), timeout=2)
-        assert '226' not in client.get('/api/v1/monitor').json()['results']
+        assert '102' not in client.get('/api/v1/monitor').json()['results']
     finally:
         for task in tasks:
             task.cancel()

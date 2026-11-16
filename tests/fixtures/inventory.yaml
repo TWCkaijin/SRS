@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "id": "101",
+      "alias": "Test_Node_101",
+      "display_name": "Test node 101",
+      "hostname": "node-101.example.test",
+      "port": 22,
+      "ssh_username": "observer",
+      "enabled": true,
+      "host_key_sha256": null,
+      "hardware": {
+        "logical_cpus": 32,
+        "memory_gb": 64,
+        "gpus": [
+          {
+            "index": 0,
+            "uuid": "GPU-test-101-0",
+            "name": "Fixture GPU",
+            "memory_mb": 24576,
+            "in_scope": true
+          },
+          {
+            "index": 1,
+            "uuid": "GPU-test-101-1",
+            "name": "Fixture GPU",
+            "memory_mb": 24576,
+            "in_scope": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "102",
+      "alias": "Test_Node_102",
+      "display_name": "Test node 102",
+      "hostname": "node-102.example.test",
+      "port": 22,
+      "ssh_username": "observer",
+      "enabled": false,
+      "host_key_sha256": null,
+      "hardware": {
+        "logical_cpus": 32,
+        "memory_gb": 64,
+        "gpus": [
+          {
+            "index": 0,
+            "uuid": "GPU-test-102-0",
+            "name": "Fixture GPU",
+            "memory_mb": 24576,
+            "in_scope": true
+          },
+          {
+            "index": 1,
+            "uuid": "GPU-test-102-1",
+            "name": "Fixture GPU",
+            "memory_mb": 24576,
+            "in_scope": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "103",
+      "alias": "Test_Node_103",
+      "display_name": "Test node 103",
+      "hostname": "node-103.example.test",
+      "port": 22,
+      "ssh_username": "observer",
+      "enabled": true,
+      "host_key_sha256": null,
+      "hardware": {
+        "logical_cpus": 32,
+        "memory_gb": 64,
+        "gpus": [
+          {
+            "index": 0,
+            "uuid": "GPU-test-103-0",
+            "name": "Fixture GPU",
+            "memory_mb": 24576,
+            "in_scope": true
+          },
+          {
+            "index": 1,
+            "uuid": "GPU-test-103-1",
+            "name": "Fixture GPU",
+            "memory_mb": 24576,
+            "in_scope": true
+          }
+        ]
+      }
+    }
+  ]
+}

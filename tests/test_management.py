@@ -12,7 +12,7 @@ from test_ssh_hosts import result, save
 
 def schedule(client):
     response = client.post('/api/v1/schedules', json={'title': 'Delete test', 'operation': 'host_snapshot',
-        'host_ids': ['225'], 'interval_seconds': 30, 'starts_at': datetime.now(UTC).isoformat(),
+        'host_ids': ['101'], 'interval_seconds': 30, 'starts_at': datetime.now(UTC).isoformat(),
         'expires_at': (datetime.now(UTC) + timedelta(hours=1)).isoformat(), 'scope': {'job_ids': []}})
     assert response.status_code == 201, response.text
     return response.json()
@@ -41,21 +41,21 @@ def test_delete_active_schedule_preserves_history_and_revokes_pending_runs(platf
     assert len(client.get('/api/v1/executions').json()['items']) == 2
 
 
-@pytest.mark.parametrize('node_id', ['225', '226', None])
+@pytest.mark.parametrize('node_id', ['101', '102', None])
 def test_host_delete_clears_credentials_profile_and_does_not_reappear(platform, node_id):
     client, app, worker = platform
     host = save(client, node_id=node_id)
     identifier = host['node_id']
-    start = client.post('/api/v1/monitor', json={'host_ids': [identifier, '250']})
+    start = client.post('/api/v1/monitor', json={'host_ids': [identifier, '103']})
     assert start.status_code == 200
     response = client.request('DELETE', '/api/v1/ssh-hosts/' + identifier,
         json={'inventory_revision': 1, 'revision': host['revision']})
     assert response.status_code == 204, response.text
-    with app.state.factory() as db:
+    with app.state.factory.begin() as db:
         assert db.get(SSHHost, identifier) is None
         assert db.get(Node, identifier).facts['deleted_at']
         monitor = db.scalar(select(MonitorSession))
-        assert monitor.host_ids == ['250']
+        assert monitor.host_ids == ['103']
         seed(db, app.state.settings)
     worker.import_legacy_settings()
     assert identifier not in {n['id'] for n in client.get('/api/v1/nodes').json()['items']}
@@ -66,29 +66,29 @@ def test_host_delete_clears_credentials_profile_and_does_not_reappear(platform, 
 
 def test_delete_unconfigured_seed_host_and_stale_edits(platform):
     client, app, _ = platform
-    assert client.request('DELETE', '/api/v1/ssh-hosts/226', json={'inventory_revision': 1}).status_code == 204
-    host = save(client, node_id='225')
-    stale = client.request('DELETE', '/api/v1/ssh-hosts/225', json={'inventory_revision': 1, 'revision': host['revision'] + 1})
+    assert client.request('DELETE', '/api/v1/ssh-hosts/102', json={'inventory_revision': 1}).status_code == 204
+    host = save(client, node_id='101')
+    stale = client.request('DELETE', '/api/v1/ssh-hosts/101', json={'inventory_revision': 1, 'revision': host['revision'] + 1})
     assert stale.status_code == 409
     with app.state.factory() as db:
-        assert not db.get(Node, '225').facts.get('deleted_at')
-        assert db.get(SSHHost, '225') is not None
+        assert not db.get(Node, '101').facts.get('deleted_at')
+        assert db.get(SSHHost, '101') is not None
 
 
 @pytest.mark.asyncio
 async def test_inflight_probe_cannot_restore_a_deleted_host(platform):
     client, app, worker = platform
-    host = save(client, node_id='225')
-    client.post('/api/v1/monitor', json={'host_ids': ['225']})
+    host = save(client, node_id='101')
+    client.post('/api/v1/monitor', json={'host_ids': ['101']})
     async def probe(_):
-        response = client.request('DELETE', '/api/v1/ssh-hosts/225', json={'inventory_revision': 1, 'revision': host['revision']})
+        response = client.request('DELETE', '/api/v1/ssh-hosts/101', json={'inventory_revision': 1, 'revision': host['revision']})
         assert response.status_code == 204
         return result()
     worker.probe = probe
     await worker.run_once()
     assert client.get('/api/v1/monitor').json()['results'] == {}
     with app.state.factory() as db:
-        assert db.get(SSHHost, '225') is None
+        assert db.get(SSHHost, '101') is None
 
 
 def test_delete_requires_csrf_and_correct_permission(platform):
@@ -96,8 +96,8 @@ def test_delete_requires_csrf_and_correct_permission(platform):
     item = schedule(client)
     csrf = client.headers.pop('X-CSRF-Token')
     assert client.delete('/api/v1/schedules/' + item['id']).status_code == 403
-    assert client.request('DELETE', '/api/v1/ssh-hosts/226', json={'inventory_revision': 1}).status_code == 403
+    assert client.request('DELETE', '/api/v1/ssh-hosts/102', json={'inventory_revision': 1}).status_code == 403
     client.headers['X-CSRF-Token'] = csrf
     app.state.settings.permissions = 'read'
     assert client.delete('/api/v1/schedules/' + item['id']).status_code == 403
-    assert client.request('DELETE', '/api/v1/ssh-hosts/226', json={'inventory_revision': 1}).status_code == 403
+    assert client.request('DELETE', '/api/v1/ssh-hosts/102', json={'inventory_revision': 1}).status_code == 403

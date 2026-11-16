@@ -23,11 +23,11 @@ it('registers a new SSH host from the browser with its password', async () => {
 });
 it('retains an existing encrypted password when the edit form is blank', async () => {
   const request = vi.spyOn(api, 'post').mockResolvedValue({});
-  const host = { node_id: '226', display_name: '226', hostname: 'host', port: 22, username: 'user', revision: 3, password_configured: true } as SSHHost;
-  render(<ConsoleContext.Provider value={context}><SSHHostForm node={{ id: '226', alias: '226', ssh_connection: host } as Node} onClose={vi.fn()} /></ConsoleContext.Provider>);
+  const host = { node_id: '102', display_name: '102', hostname: 'host', port: 22, username: 'user', revision: 3, password_configured: true } as SSHHost;
+  render(<ConsoleContext.Provider value={context}><SSHHostForm node={{ id: '102', alias: '102', ssh_connection: host } as Node} onClose={vi.fn()} /></ConsoleContext.Provider>);
   expect(screen.getByLabelText('SSH 密碼')).toHaveValue('');
   await userEvent.click(screen.getByRole('button', { name: '儲存並連線' }));
-  expect(request).toHaveBeenCalledWith('/ssh-hosts', expect.objectContaining({ node_id: '226', revision: 3, password: null }));
+  expect(request).toHaveBeenCalledWith('/ssh-hosts', expect.objectContaining({ node_id: '102', revision: 3, password: null }));
 });
 it('requires fingerprint acknowledgement before trusting a new SSH key', async () => {
   const request = vi.spyOn(api, 'post').mockResolvedValue({});

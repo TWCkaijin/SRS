@@ -7,6 +7,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
+LOCAL_INVENTORY = ROOT / "config" / "inventory.yaml"
 PERMISSIONS = (
     "hosts.terminal", "hosts.accounts", "read", "monitor.manage", "hosts.manage", "project.manage", "draft.manage", "plan.approve", "execution.stop", "execution.reconcile",
     "schedule.manage", "schedule.approve", "schedule.enable",
@@ -19,7 +20,7 @@ class Settings(BaseSettings):
     mode: Literal["demo", "local-slurm", "remote-slurm"] = "demo"
     database_url: str = f"sqlite:///{ROOT / 'var' / 'srs-demo.sqlite3'}"
     data_dir: Path = ROOT / "var"
-    inventory_file: Path = ROOT / "config" / "inventory.yaml"
+    inventory_file: Path = LOCAL_INVENTORY
     project_root: Path = Path("/srv/srs/projects")
     web_admin_username: str = Field(default="admin", validation_alias="WEB_ADMIN_USERNAME")
     web_admin_password: SecretStr = Field(default=SecretStr(""), validation_alias="WEB_ADMIN_PASSWORD")
@@ -35,6 +36,7 @@ class Settings(BaseSettings):
     slurm_api_version: str = "v0.0.45"
     slurm_base_url: str = "http://127.0.0.1:6820"
     slurm_owner: str = "srs-runner"
+    slurm_controller_id: str = Field(default="225", min_length=1, max_length=64)
     max_schedule_days: int = 30
     request_max_bytes: int = 1024 * 1024
 
