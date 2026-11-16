@@ -7,6 +7,7 @@ import { Badge, Button, EmptyState, Field, InlineError, Loading, Meter, Modal, P
 import { formatDate, percent } from '../utils';
 import { BatchAccounts, batchHostReady } from './BatchAccounts';
 import { HostAccounts } from './HostAccess';
+import { GpuFinder, isRecentGpuObservation, observedGpus } from './GpuFinder';
 
 export type ActivitySnapshot = NonNullable<Node['snapshot']> & {
   login_users?: { username: string; terminal: string; login_time: string; origin: string }[];
@@ -63,23 +64,45 @@ function ResolveAlertButton({ alert, resolving, onResolve }: { alert: Alert; res
   return <Button className="alert-resolve" variant="ghost" busy={resolving === alert.id} disabled={resolving !== null}
     aria-label={`標為已處理：${alert.message}`} onClick={() => void onResolve(alert)}>標為已處理</Button>;
 }
-const recent = (sample: Sample | null) => sample && Date.now() - Date.parse(sample.collected_at) < 60000;
 export function HostActivity({ snapshot, defaultOpen = false }: { snapshot: ActivitySnapshot | null; defaultOpen?: boolean }) {
-  return <details className="host-activity" open={defaultOpen}><summary>GPU 程序</summary>
+  const processes = snapshot?.gpu_processes;
+  return <details className="host-activity" open={defaultOpen}>
+    <summary>GPU 程序{processes?.length ? <span className="host-activity-count">{processes.length} 筆</span> : null}</summary>
     {!snapshot ? <p>啟動監控後顯示，尚無觀測資料。</p> : <>
       <InlineError message={snapshot.gpu_process_error || ''} />
-      {snapshot.gpu_processes === undefined ? <p>這筆舊觀測尚未包含程序，請重新開始監控。</p> : snapshot.gpu_processes.length ? <div className="table-scroll"><table><thead><tr><th>GPU</th><th>PID / 使用者</th><th>程序</th><th>VRAM</th></tr></thead><tbody>{snapshot.gpu_processes.map((p, i) => <tr key={i}><td>{snapshot.gpus?.find(g => g.uuid === p.gpu_uuid)?.index ?? p.gpu_uuid}</td><td>{p.pid} / {p.username || '無法讀取'}</td><td>{p.name}</td><td>{p.memory_mb == null ? '不支援回報' : `${p.memory_mb} MiB`}</td></tr>)}</tbody></table></div> : !snapshot.gpu_process_error && <p>未回報 GPU 計算程序。</p>}
-      <p className="muted">唯讀顯示 NVIDIA 計算程序，不含圖形程序與完整命令參數。</p>
+      {processes === undefined ? <p>這筆舊觀測尚未包含程序，請重新開始監控。</p> :
+        processes.length ? <ul className="gpu-process-grid">
+          {processes.map((process, index) => {
+            const gpu = snapshot.gpus?.find(item => item.uuid === process.gpu_uuid);
+            return <li key={`${process.gpu_uuid}:${process.pid}:${index}`}>
+              <span className="gpu-process-device">{gpu ? `GPU ${gpu.index}` : process.gpu_uuid}</span>
+              <strong className="gpu-process-name">{process.name}</strong>
+              <dl>
+                <div><dt>PID / 使用者</dt><dd>{process.pid} / {process.username || '無法讀取'}</dd></div>
+                <div><dt>VRAM</dt><dd>{process.memory_mb == null ? '不支援回報' : `${process.memory_mb} MiB`}</dd></div>
+              </dl>
+            </li>;
+          })}
+        </ul> : !snapshot.gpu_process_error && <p>未回報 GPU 計算程序。</p>}
+      <p className="muted gpu-process-note">顯示 NVIDIA 計算程序與顯示記憶體用量。</p>
     </>}
   </details>;
 }
 export function DashboardPage() {
   const { value, error, resolve, resolving, resolveError, status } = useOverview();
   const { data, navigate, can } = useConsole();
-  const fresh = value?.hosts.filter(host => recent(host.latest) && host.latest?.result.status === 'online') || [];
-  const gpus = fresh.flatMap(host => host.latest?.result.snapshot?.gpus || []);
-  const knownVram = gpus.filter(gpu => gpu.memory_total_mb != null && gpu.memory_used_mb != null);
-  const freeVram = knownVram.reduce((sum, gpu) => sum + Math.max(0, gpu.memory_total_mb! - gpu.memory_used_mb!), 0);
+  const [clock, setClock] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const renderClock = Math.max(clock, Date.now());
+  const fresh = value?.hosts.filter(host => host.latest && isRecentGpuObservation(host.latest.collected_at, renderClock)
+    && host.latest.result.status === 'online') || [];
+  const observations = observedGpus(value?.hosts || [], renderClock);
+  const gpus = observations.filter(row => row.fresh);
+  const knownVram = gpus.filter(row => row.freeMiB !== null);
+  const freeVram = knownVram.reduce((sum, row) => sum + (row.freeMiB ?? 0), 0);
   const activeAlerts = value?.alerts.filter(alert => !alert.resolved_at) || [];
   const latestAlerts = [...activeAlerts].sort((a, b) => Date.parse(b.last_seen_at) - Date.parse(a.last_seen_at)).slice(0, 3);
   const metrics = [
@@ -98,12 +121,13 @@ export function DashboardPage() {
           <strong>{number}</strong><small>{detail}</small>
         </div>)}
       </div>
+      <GpuFinder rows={observations} />
       <div className="dashboard-layout">
         <Section className="dashboard-hosts" title="主機觀測摘要">
           {value.hosts.length ? <ul className="dashboard-host-list">{value.hosts.map(host => {
             const sample = host.latest;
             const snapshot = sample?.result.snapshot;
-            const current = recent(sample);
+            const current = sample && isRecentGpuObservation(sample.collected_at, renderClock);
             const label = !sample ? '尚未觀測' : !current ? '舊紀錄' : sample.result.status === 'online' ? '近期成功' : '觀測失敗';
             return <li key={host.host_id}>
               <div className="dashboard-host-identity">

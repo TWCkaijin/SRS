@@ -28,10 +28,15 @@ remain authoritative. No Apple-native framework is used.
   rows use a compact native vertical scroll region with a count, a visible hint,
   and keyboard focus. The viewport follows the measured height of the first two
   GPU rows so a third row does not appear clipped in the resting view. Successful observations take precedence over inventory.
-- Host disclosure uses three sections ordered hardware, storage and network.
-  Columns wrap according to the available card width and stack on a phone.
-  Storage and network lead with observed usage. Lower-priority inventory,
-  SSH identity and GPU process records have their own disclosures.
+- Expanded host cards use one left-to-right grid ordered hardware, storage,
+  network and GPU processes. Medium cards use two columns. Narrow cards keep the
+  same reading order in one column. Additional network interfaces, inventory,
+  GPU processes and SSH identity have separate disclosures. GPU summary rows
+  label sampled compute utilization separately from VRAM used.
+- The dashboard GPU finder sorts and filters by reported free VRAM (total minus
+  used), with an 8 GiB default threshold. Each result shows the observation time.
+  Only complete measurements less than 60 seconds old count as current. Older
+  measurements are shown in a separate optional list and never count as current.
 - Login sessions (`who`) appear below the searchable host directory in Account Management, refreshed every
   30 seconds from the existing monitor state only. Unmonitored, expired, failed or
   stale readings never appear as current login counts. Counts deduplicate usernames.

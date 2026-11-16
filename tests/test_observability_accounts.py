@@ -136,7 +136,7 @@ def test_execution_failure_is_not_retried(platform, monkeypatch):
         assert db.get(AccountPlan, plan["id"]).status == "unconfirmed"
 
 
-def test_remote_preconditions_and_delete_process_guard(monkeypatch):
+def test_remote_preconditions_and_delete_process_guard(monkeypatch, tmp_path):
     import os
     import pwd
     import subprocess
@@ -170,13 +170,13 @@ def test_remote_preconditions_and_delete_process_guard(monkeypatch):
     }
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"document": document, "password": ""})))
     with redirect_stdout(io.StringIO()), pytest.raises(SystemExit):
-        exec(EXEC_SCRIPT, {})
+        exec(EXEC_SCRIPT, {"open": lambda _, mode: (tmp_path / "runner.lock").open(mode)})
     assert calls == [["pgrep", "-u", "1001"]]
     calls.clear()
     document["expected"] = {**USER, "uid": 1002}
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"document": document, "password": ""})))
     with redirect_stdout(io.StringIO()), pytest.raises(SystemExit):
-        exec(EXEC_SCRIPT, {})
+        exec(EXEC_SCRIPT, {"open": lambda _, mode: (tmp_path / "runner.lock").open(mode)})
     assert calls == []
 
 

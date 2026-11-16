@@ -109,3 +109,44 @@ def test_group_and_permissions_changes_are_local_and_require_review(platform, mo
     app.state.settings.permissions += ",plan.approve"
     assert client.post(endpoint, json=approval).status_code == 200
     assert operations[0][1]["document"]["expected_group"]["member"] is True
+
+
+def test_runner_refuses_group_with_stale_membership_before_command(tmp_path, monkeypatch):
+    import grp
+    import io
+    import os
+    import pwd
+    import subprocess
+    import sys
+    from unittest.mock import Mock
+
+    import pytest
+    from srs.account_plans import EXEC_SCRIPT
+
+    target = user("researcher", 1024, 1024)
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    monkeypatch.setattr(pwd, "getpwnam", lambda _: SimpleNamespace(
+        pw_name="researcher", pw_uid=1024, pw_gid=1024, pw_gecos="",
+        pw_dir="/home/researcher", pw_shell="/bin/bash",
+    ))
+    monkeypatch.setattr(grp, "getgrnam", lambda _: SimpleNamespace(gr_gid=1030, gr_mem=["researcher"]))
+    run = Mock()
+    monkeypatch.setattr(subprocess, "run", run)
+    document = {
+        "username": "researcher", "action": "groups", "expected": target,
+        "expected_group": {"name": "team", "gid": 1030, "member": False}, "membership": "add",
+        "commands": [["gpasswd", "-a", "researcher", "--", "team"]],
+    }
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"document": document, "password": ""})))
+
+    def open_fixture(path, mode="r", **_):
+        if path == "/etc/group":
+            return io.StringIO("team:x:1030:researcher\n")
+        if path == "/etc/passwd":
+            return io.StringIO("researcher:x:1024:1024::/home/researcher:/bin/bash\n")
+        return (tmp_path / "runner.lock").open(mode)
+
+    with pytest.raises(SystemExit) as error:
+        exec(EXEC_SCRIPT, {"open": open_fixture})
+    assert error.value.code == 1
+    run.assert_not_called()

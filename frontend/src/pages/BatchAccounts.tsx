@@ -55,7 +55,7 @@ export function BatchAccounts({ hosts, onClose }: { hosts: Node[]; onClose: () =
     const form = event.currentTarget;
     const values = new FormData(form);
     const password = String(values.get('shared-password') || '');
-    if (!password || /[:\u0000-\u001f]/.test(password) || plan.items.some((item, i) => /[:\u0000-\u001f]/.test(String(values.get(`sudo-${i}`) || '')))) {
+    if (!password || /[:\u0000-\u001f]/.test(password) || plan.items.some((_, i) => /[:\u0000-\u001f]/.test(String(values.get(`sudo-${i}`) || '')))) {
       setError('帳號密碼必填。密碼欄位不能包含冒號或控制字元。');
       return;
     }
@@ -65,8 +65,9 @@ export function BatchAccounts({ hosts, onClose }: { hosts: Node[]; onClose: () =
     let halted = false;
     try {
       for (const [index, item] of plan.items.entries()) {
-        if (halted) {
-          next[item.host_id] = { state: '未執行' };
+        if (halted || Date.parse(item.expires_at) <= Date.now()) {
+          next[item.host_id] = { state: '未執行', detail: halted ? undefined : '計畫已到期，請重新規劃。' };
+          halted = true;
           continue;
         }
         setCurrent(names.get(item.host_id) || item.host_id);

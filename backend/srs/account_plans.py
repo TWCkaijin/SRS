@@ -226,7 +226,7 @@ def register_account_plan_routes(app, factory, permission, settings):
 
         checks = await asyncio.gather(*(inspect_target(node, revision) for node, revision in payload.hosts.items()))
         failures = [
-            f"{node}：{check.detail}" for node, check in zip(payload.hosts, checks)
+            f"{node}：{check.detail}" for node, check in zip(payload.hosts, checks, strict=True)
             if isinstance(check, HTTPException)
         ]
         if failures:
@@ -236,7 +236,7 @@ def register_account_plan_routes(app, factory, permission, settings):
             (candidate for candidate in range(1000, 60000) if candidate not in occupied), None
         )
         if number is None or number in occupied:
-            conflict = [node for node, (_, ids) in zip(payload.hosts, checks) if number in ids]
+            conflict = [node for node, (_, ids) in zip(payload.hosts, checks, strict=True) if number in ids]
             suffix = "：" + "、".join(conflict) if conflict else ""
             raise HTTPException(409, "指定的 UID／GID 已被使用，或找不到共同可用的編號" + suffix)
         username = payload.username
@@ -244,7 +244,7 @@ def register_account_plan_routes(app, factory, permission, settings):
         identity = {"uid": number, "gid": number, "home": home}
         items = []
         with factory.begin() as db:
-            for node, (host, _) in zip(payload.hosts, checks):
+            for node, (host, _) in zip(payload.hosts, checks, strict=True):
                 commands = [
                     ["groupadd", "-g", str(number), "--", username],
                     ["useradd", "-m", "-d", home, "-s", "/bin/bash", "-c", payload.name,
